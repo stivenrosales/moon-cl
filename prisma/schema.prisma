@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth (NextAuth / Auth.js)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(MEMBER)
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  suggestions     BookSuggestion[]
+  votes           Vote[]
+  comments        Comment[]
+  ratings         Rating[]
+  rsvps           Rsvp[]
+  progressUpdates ReadingProgress[]
+  createdRounds   Round[]           @relation("RoundCreator")
+  createdMeetings Meeting[]         @relation("MeetingCreator")
+}
+
+enum Role {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dominio del club
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Book {
+  id            String     @id @default(cuid())
+  title         String
+  authors       String[]
+  coverUrl      String?
+  description   String?    @db.Text
+  pageCount     Int?
+  publishedYear Int?
+  googleBooksId String?    @unique
+  isbn          String?
+  status        BookStatus @default(SUGGESTED)
+  isCurrent     Boolean    @default(false)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  suggestions     BookSuggestion[]
+  comments        Comment[]
+  ratings         Rating[]
+  progressUpdates ReadingProgress[]
+  meetings        Meeting[]
+  wonRound        Round?            @relation("RoundWinner")
+}
+
+enum BookStatus {
+  SUGGESTED // sugerido en alguna ronda, sin estado especial
+  CURRENT // libro en curso del club
+  FINISHED // ya leído por el club
+  ARCHIVED // perdió la votación, queda en historial
+}
+
+model Round {
+  id           String      @id @default(cuid())
+  title        String
+  description  String?     @db.Text
+  startsAt     DateTime
+  endsAt       DateTime
+  status       RoundStatus @default(SCHEDULED)
+  winnerBookId String?     @unique
+  creatorId    String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  winner      Book?            @relation("RoundWinner", fields: [winnerBookId], references: [id])
+  creator     User?            @relation("RoundCreator", fields: [creatorId], references: [id])
+  suggestions BookSuggestion[]
+}
+
+enum RoundStatus {
+  SCHEDULED
+  OPEN
+  CLOSED
+}
+
+model BookSuggestion {
+  id        String   @id @default(cuid())
+  roundId   String
+  bookId    String
+  userId    String
+  pitch     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  round Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  book  Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes Vote[]
+
+  @@unique([roundId, bookId])
+  @@index([roundId])
+}
+
+model Vote {
+  id           String   @id @default(cuid())
+  suggestionId String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  suggestion BookSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([suggestionId, userId])
+  @@index([suggestionId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  bookId    String
+  userId    String
+  parentId  String?
+  content   String    @db.Text
+  isSpoiler Boolean   @default(false)
+  chapter   Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  book    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([bookId])
+  @@index([parentId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  bookId    String
+  userId    String
+  stars     Int
+  review    String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, userId])
+  @@index([bookId])
+}
+
+model ReadingProgress {
+  id          String   @id @default(cuid())
+  bookId      String
+  userId      String
+  currentPage Int
+  note        String?
+  createdAt   DateTime @default(now())
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, userId])
+  @@index([userId])
+}
+
+model Meeting {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  bookId      String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  location    String?
+  meetingUrl  String?
+  isVirtual   Boolean   @default(false)
+  creatorId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  book    Book?  @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  creator User?  @relation("MeetingCreator", fields: [creatorId], references: [id])
+  rsvps   Rsvp[]
+
+  @@index([startsAt])
+}
+
+model Rsvp {
+  id        String     @id @default(cuid())
+  meetingId String
+  userId    String
+  status    RsvpStatus
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, userId])
+  @@index([meetingId])
+}
+
+enum RsvpStatus {
+  YES
+  NO
+  MAYBE
+}

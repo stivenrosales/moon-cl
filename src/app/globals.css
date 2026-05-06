@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Moon Club de Lectura — Editorial cósmico
+   Paleta: midnight aubergine + lavender + parchment cream + tarnished gold
+   ────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Light: pergamino crema + aubergine + lavanda */
+    --background: 36 47% 95%;            /* #F5EFE2  parchment cream */
+    --foreground: 268 52% 16%;           /* #2A1740  deep aubergine */
+
+    --card: 36 56% 97%;
+    --card-foreground: 268 52% 16%;
+
+    --popover: 36 56% 97%;
+    --popover-foreground: 268 52% 16%;
+
+    --primary: 268 48% 56%;              /* #9B73CE  lavender */
+    --primary-foreground: 36 47% 96%;
+
+    --secondary: 268 30% 88%;
+    --secondary-foreground: 268 52% 22%;
+
+    --muted: 268 22% 90%;
+    --muted-foreground: 268 18% 38%;
+
+    --accent: 41 50% 64%;                /* #D4B770  tarnished gold */
+    --accent-foreground: 268 52% 14%;
+
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 268 24% 82%;
+    --input: 268 24% 82%;
+    --ring: 268 48% 56%;
+
+    --radius: 0.875rem;
+  }
+
+  .dark {
+    /* Dark: midnight aubergine + lavanda viva + crema cálida para texto */
+    --background: 263 38% 8%;            /* #11091F  midnight */
+    --foreground: 36 38% 92%;            /* #F2E8D6  parchment glow */
+
+    --card: 263 32% 11%;
+    --card-foreground: 36 38% 92%;
+
+    --popover: 263 36% 10%;
+    --popover-foreground: 36 38% 92%;
+
+    --primary: 268 60% 70%;              /* lavanda viva */
+    --primary-foreground: 263 38% 10%;
+
+    --secondary: 263 28% 17%;
+    --secondary-foreground: 36 38% 92%;
+
+    --muted: 263 24% 15%;
+    --muted-foreground: 268 26% 70%;
+
+    --accent: 41 56% 64%;                /* gold */
+    --accent-foreground: 263 38% 10%;
+
+    --destructive: 0 60% 52%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 263 24% 20%;
+    --input: 263 24% 22%;
+    --ring: 268 60% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "ss01", "ss02", "cv11";
+  }
+
+  /* Display (Fraunces) — for h1/h2 cosmic editorial vibe */
+  h1, h2, .display {
+    font-family: var(--font-display), "Fraunces", Georgia, serif;
+    font-feature-settings: "ss01", "ss02";
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+    background-clip: padding-box;
+  }
+}
+
+@layer components {
+  /* Atmosphere: subtle film grain overlay */
+  .grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+  }
+
+  .moon-glow {
+    background:
+      radial-gradient(60% 50% at 75% -10%, hsl(var(--primary) / 0.28) 0%, transparent 60%),
+      radial-gradient(40% 30% at 10% 90%, hsl(var(--accent) / 0.15) 0%, transparent 60%);
+  }
+
+  .ornate-divider {
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), hsl(var(--accent) / 0.5), hsl(var(--primary) / 0.5), transparent);
+    height: 1px;
+  }
+
+  .gold-shimmer {
+    background: linear-gradient(110deg, hsl(var(--accent) / 0.7), hsl(var(--accent)) 35%, hsl(36 60% 90%) 50%, hsl(var(--accent)) 65%, hsl(var(--accent) / 0.7));
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 4s linear infinite;
+  }
+
+  .hand-script {
+    font-family: var(--font-hand), "Caveat", cursive;
+  }
+
+  .hairline {
+    border-color: hsl(var(--border) / 0.8);
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-primary;
+  }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

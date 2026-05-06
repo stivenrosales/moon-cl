@@ -51,7 +51,7 @@ export default async function PerfilPage() {
         </Avatar>
         <div className="flex-1 space-y-2">
           <span className="text-xs uppercase tracking-[0.32em] text-accent">Tu perfil</span>
-          <h1 className="display text-4xl md:text-5xl leading-tight">
+          <h1 className="h1-display display">
             {user.name ?? user.email?.split("@")[0]}
           </h1>
           <div className="flex flex-wrap items-center gap-2">

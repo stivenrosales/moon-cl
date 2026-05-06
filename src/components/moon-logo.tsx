@@ -1,17 +1,17 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-interface LogoProps extends React.SVGProps<SVGSVGElement> {
+interface LogoProps extends Omit<React.SVGProps<SVGSVGElement>, "width" | "height"> {
   withText?: boolean;
   size?: number;
 }
 
-export function MoonLogo({ className, withText = false, size = 56, ...props }: LogoProps) {
+export function MoonLogo({ className, withText = false, size, ...props }: LogoProps) {
+  const dim = size ?? (className ? undefined : 56);
   return (
     <svg
       viewBox="0 0 200 200"
-      width={size}
-      height={size}
+      {...(dim ? { width: dim, height: dim } : {})}
       className={cn("text-primary", className)}
       aria-hidden="true"
       {...props}

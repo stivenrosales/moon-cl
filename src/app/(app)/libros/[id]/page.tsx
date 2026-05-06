@@ -87,7 +87,7 @@ export default async function BookPage({
             {book.publishedYear ? <Badge variant="outline">{book.publishedYear}</Badge> : null}
             {book.pageCount ? <Badge variant="secondary">{book.pageCount} páginas</Badge> : null}
           </div>
-          <h1 className="display text-4xl md:text-5xl leading-tight">{book.title}</h1>
+          <h1 className="h1-display display">{book.title}</h1>
           {book.authors.length ? (
             <p className="text-lg text-muted-foreground">{book.authors.join(", ")}</p>
           ) : null}
@@ -114,7 +114,7 @@ export default async function BookPage({
       </header>
 
       <Tabs defaultValue="progress">
-        <TabsList className="flex-wrap">
+        <TabsList>
           <TabsTrigger value="progress">
             <BookOpen className="mr-2 h-3.5 w-3.5" />
             Avance

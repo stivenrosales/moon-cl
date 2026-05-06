@@ -39,7 +39,7 @@ export default async function Landing() {
               Un club de lectura íntimo
             </div>
 
-            <h1 className="display text-5xl md:text-7xl leading-[1.05] tracking-tight">
+            <h1 className="display leading-[1.05] tracking-tight text-[clamp(2.25rem,8vw,4.5rem)]">
               Leemos <span className="hand-script italic text-primary">juntos</span>,
               <br />
               bajo la <span className="gold-shimmer font-semibold">misma luna</span>.
@@ -74,12 +74,12 @@ export default async function Landing() {
           </div>
 
           {/* Hero visual */}
-          <div className="relative aspect-square w-full max-w-[520px] mx-auto">
+          <div className="relative aspect-square w-full max-w-[320px] sm:max-w-[420px] lg:max-w-[520px] mx-auto">
             <div className="absolute inset-0 rounded-full bg-primary/10 blur-3xl" />
             <div className="absolute inset-6 rounded-full border border-primary/20" />
             <div className="absolute inset-12 rounded-full border border-primary/10" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <MoonLogo size={360} className="animate-float" />
+              <MoonLogo className="animate-float h-[70%] w-auto" />
             </div>
           </div>
         </section>

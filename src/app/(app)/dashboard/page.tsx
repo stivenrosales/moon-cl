@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         <span className="text-xs uppercase tracking-[0.32em] text-accent">
           {greet()}, {session.user.name ?? session.user.email?.split("@")[0]}
         </span>
-        <h1 className="display text-4xl md:text-5xl leading-tight">
+        <h1 className="h1-display display">
           Bajo la <span className="hand-script italic text-primary">misma luna</span>.
         </h1>
       </header>

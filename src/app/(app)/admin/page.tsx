@@ -47,7 +47,7 @@ export default async function AdminPage() {
     <div className="space-y-12">
       <header>
         <span className="text-xs uppercase tracking-[0.32em] text-accent">Cabina del club</span>
-        <h1 className="display mt-2 text-4xl md:text-5xl leading-tight">
+        <h1 className="h1-display display mt-2">
           Panel <span className="hand-script italic text-primary">admin</span>
         </h1>
       </header>

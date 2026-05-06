@@ -81,8 +81,8 @@ export function Nav({ user }: NavProps) {
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
           <DropdownMenu>
-            <DropdownMenuTrigger className="rounded-full focus-ring">
-              <Avatar>
+            <DropdownMenuTrigger className="rounded-full focus-ring" aria-label="Menú de usuario">
+              <Avatar className="h-10 w-10">
                 {user.image ? <AvatarImage src={user.image} alt={user.name ?? ""} /> : null}
                 <AvatarFallback>{getInitials(user.name, user.email)}</AvatarFallback>
               </Avatar>
@@ -115,7 +115,7 @@ export function Nav({ user }: NavProps) {
       </div>
 
       {/* Mobile nav */}
-      <nav className="container -mt-1 flex md:hidden items-center gap-1 overflow-x-auto pb-2">
+      <nav className="container -mt-1 flex md:hidden items-center gap-1.5 overflow-x-auto scrollbar-hide pb-2">
         {links.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
@@ -123,7 +123,7 @@ export function Nav({ user }: NavProps) {
               key={href}
               href={href}
               className={cn(
-                "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs transition-colors",
                 active
                   ? "border-primary/50 bg-primary/15 text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground",

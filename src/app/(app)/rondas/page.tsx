@@ -30,7 +30,7 @@ export default async function RondasPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="text-xs uppercase tracking-[0.32em] text-accent">El club elige</span>
-          <h1 className="display mt-2 text-4xl md:text-5xl leading-tight">
+          <h1 className="h1-display display mt-2">
             Rondas de <span className="hand-script italic text-primary">votación</span>
           </h1>
         </div>

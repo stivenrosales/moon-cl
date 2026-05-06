@@ -61,7 +61,7 @@ export default async function RondaPage({
             {formatDate(round.startsAt)} → {formatDate(round.endsAt)}
           </span>
         </div>
-        <h1 className="display text-4xl md:text-5xl leading-tight">{round.title}</h1>
+        <h1 className="h1-display display">{round.title}</h1>
         {round.description ? (
           <p className="max-w-2xl text-muted-foreground leading-relaxed">{round.description}</p>
         ) : null}
@@ -163,7 +163,7 @@ export default async function RondaPage({
                         </div>
 
                         {s.pitch ? (
-                          <blockquote className="border-l-2 border-primary/40 pl-3 italic text-sm text-muted-foreground">
+                          <blockquote className="rounded-lg bg-primary/5 px-3 py-2 italic text-sm text-muted-foreground">
                             "{s.pitch}"
                           </blockquote>
                         ) : null}

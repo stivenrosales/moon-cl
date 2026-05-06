@@ -84,6 +84,9 @@
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "ss01", "ss02", "cv11";
+    /* iOS safe areas */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /* Display (Fraunces) — for h1/h2 cosmic editorial vibe */
@@ -160,6 +163,28 @@
 
   .focus-ring {
     @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-primary;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Page-level display heading: fluid 30px → 48px */
+  .h1-display {
+    font-size: clamp(1.875rem, 6vw, 3rem);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+  }
+
+  /* Section / card display heading: fluid 24px → 32px */
+  .h2-display {
+    font-size: clamp(1.5rem, 4.5vw, 2rem);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
   }
 }
 

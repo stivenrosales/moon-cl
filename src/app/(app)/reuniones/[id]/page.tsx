@@ -57,7 +57,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           <span>·</span>
           <span>{relativeTime(meeting.startsAt)}</span>
         </div>
-        <h1 className="display text-4xl md:text-5xl leading-tight">{meeting.title}</h1>
+        <h1 className="h1-display display">{meeting.title}</h1>
         {meeting.book ? (
           <p className="text-muted-foreground italic">
             sobre <em>{meeting.book.title}</em>

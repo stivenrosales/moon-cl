@@ -24,7 +24,7 @@ export default async function BibliotecaPage() {
     <div className="space-y-12">
       <header>
         <span className="text-xs uppercase tracking-[0.32em] text-accent">Memoria del club</span>
-        <h1 className="display mt-2 text-4xl md:text-5xl leading-tight">
+        <h1 className="h1-display display mt-2">
           La <span className="hand-script italic text-primary">biblioteca</span>
         </h1>
         <p className="mt-3 max-w-xl text-muted-foreground">

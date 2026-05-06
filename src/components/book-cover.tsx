@@ -13,7 +13,8 @@ const sizes = {
   sm: { w: 56, h: 84, cls: "w-14 h-20" },
   md: { w: 96, h: 144, cls: "w-24 h-36" },
   lg: { w: 144, h: 216, cls: "w-36 h-52" },
-  xl: { w: 200, h: 300, cls: "w-48 h-72" },
+  // xl: 156x234 en mobile, 200x300 en md+
+  xl: { w: 200, h: 300, cls: "w-[10rem] h-[15rem] md:w-48 md:h-72" },
 };
 
 export function BookCover({ src, title, className, size = "md" }: BookCoverProps) {

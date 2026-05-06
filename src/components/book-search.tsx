@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Label, Field, FieldDescription } from "@/components/ui/label";
 import { BookCover } from "@/components/book-cover";
 import { searchBooksAction } from "@/server/actions/books";
 import { suggestBook } from "@/server/actions/suggestions";
@@ -94,28 +94,32 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="pitch">¿Por qué lo recomiendas? <span className="lowercase tracking-normal text-muted-foreground/70">(opcional)</span></Label>
+        <Field>
+          <Label htmlFor="pitch" optional>¿Por qué lo recomiendas?</Label>
           <Textarea
             id="pitch"
             value={pitch}
             onChange={(e) => setPitch(e.target.value)}
-            placeholder="Una frase que enamore al club..."
+            placeholder="Una frase que enamore al club…"
             maxLength={800}
+            rows={3}
           />
-        </div>
+          <FieldDescription>
+            Lo verán las demás miembras al votar.
+          </FieldDescription>
+        </Field>
 
-        <div className="flex gap-2">
-          <Button onClick={handleSubmit} disabled={submitting}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2">
+          <Button variant="ghost" onClick={() => setSelected(null)} className="sm:mr-auto">
+            Buscar otro
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:w-auto">
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <BookPlus className="h-4 w-4" />
             )}
             Sugerir este libro
-          </Button>
-          <Button variant="ghost" onClick={() => setSelected(null)}>
-            Buscar otro
           </Button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Label, Field } from "@/components/ui/label";
 import { StarRating } from "@/components/star-rating";
 import { upsertRating } from "@/server/actions/ratings";
 
@@ -38,15 +38,15 @@ export function RatingForm({ bookId, initialStars = 0, initialReview = "" }: Rat
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       <div className="flex items-center gap-3">
-        <StarRating value={stars} onChange={setStars} size={28} />
+        <StarRating value={stars} onChange={setStars} size={32} />
         <span className="text-sm text-muted-foreground tabular-nums">
           {stars > 0 ? `${stars}/5` : "Sin valorar"}
         </span>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="review">Tu reseña <span className="lowercase tracking-normal text-muted-foreground/70">(opcional)</span></Label>
+      <Field>
+        <Label htmlFor="review" optional>Tu reseña</Label>
         <Textarea
           id="review"
           value={review}
@@ -55,8 +55,8 @@ export function RatingForm({ bookId, initialStars = 0, initialReview = "" }: Rat
           maxLength={4000}
           rows={4}
         />
-      </div>
-      <Button type="submit" disabled={submitting}>
+      </Field>
+      <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         Guardar valoración
       </Button>

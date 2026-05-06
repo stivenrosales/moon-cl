@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <div className="container flex min-h-screen items-center justify-center py-16">
+    <div className="container flex min-h-dvh items-center justify-center py-16">
       <div className="text-center space-y-6 animate-fade-up max-w-md">
         <MoonLogo size={96} className="mx-auto" />
         <h1 className="display text-5xl">404</h1>

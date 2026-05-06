@@ -60,7 +60,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${display.variable} ${sans.variable} ${hand.variable}`}
     >
-      <body className="min-h-screen bg-background text-foreground antialiased grain">
+      <body className="min-h-dvh bg-background text-foreground antialiased grain">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <Starfield />
           <div className="relative z-10">{children}</div>

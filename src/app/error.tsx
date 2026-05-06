@@ -17,7 +17,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="container flex min-h-screen items-center justify-center py-16">
+    <div className="container flex min-h-dvh items-center justify-center py-16">
       <div className="text-center space-y-6 max-w-md">
         <MoonLogo size={84} className="mx-auto opacity-60" />
         <h1 className="display text-3xl">Algo se nubló</h1>

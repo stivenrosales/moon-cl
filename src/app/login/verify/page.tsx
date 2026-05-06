@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export default function VerifyPage() {
   return (
-    <div className="container flex min-h-screen items-center justify-center py-16">
+    <div className="container flex min-h-dvh items-center justify-center py-16">
       <div className="w-full max-w-md text-center space-y-8 animate-fade-up">
         <MoonLogo size={84} className="mx-auto" />
         <div>

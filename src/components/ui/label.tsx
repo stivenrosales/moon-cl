@@ -4,19 +4,52 @@ import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
 import { cn } from "@/lib/utils";
 
-const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
+interface LabelProps extends React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> {
+  optional?: boolean;
+  required?: boolean;
+}
+
+const Label = React.forwardRef<React.ElementRef<typeof LabelPrimitive.Root>, LabelProps>(
+  ({ className, optional, required, children, ...props }, ref) => (
+    <LabelPrimitive.Root
+      ref={ref}
+      className={cn(
+        "inline-flex items-baseline gap-1.5 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {required ? (
+        <span aria-hidden className="text-accent">·</span>
+      ) : null}
+      {optional ? (
+        <span className="text-muted-foreground/60 normal-case tracking-normal text-[10px]">
+          opcional
+        </span>
+      ) : null}
+    </LabelPrimitive.Root>
+  ),
+);
+Label.displayName = LabelPrimitive.Root.displayName;
+
+const FieldDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <LabelPrimitive.Root
+  <p
     ref={ref}
-    className={cn(
-      "text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-      className,
-    )}
+    className={cn("text-xs text-muted-foreground/80 leading-relaxed", className)}
     {...props}
   />
 ));
-Label.displayName = LabelPrimitive.Root.displayName;
+FieldDescription.displayName = "FieldDescription";
 
-export { Label };
+const Field = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("space-y-2", className)} {...props} />
+  ),
+);
+Field.displayName = "Field";
+
+export { Label, FieldDescription, Field };

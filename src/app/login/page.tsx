@@ -5,7 +5,7 @@ import { auth, signIn } from "@/lib/auth";
 import { MoonLogo } from "@/components/moon-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label, Field } from "@/components/ui/label";
 
 export default async function LoginPage({
   searchParams,
@@ -25,7 +25,7 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="container flex min-h-screen items-center justify-center py-16">
+    <div className="container flex min-h-dvh items-center justify-center py-16">
       <div className="w-full max-w-md space-y-10 animate-fade-up">
         <Link
           href="/"
@@ -46,17 +46,18 @@ export default async function LoginPage({
         </div>
 
         <form action={magicLink} className="space-y-5 rounded-2xl border border-border/70 bg-card/60 backdrop-blur-md p-6 shadow-2xl">
-          <div className="space-y-2">
-            <Label htmlFor="email">Tu correo</Label>
+          <Field>
+            <Label htmlFor="email" required>Tu correo</Label>
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
+              inputMode="email"
               required
               placeholder="tunombre@correo.com"
             />
-          </div>
+          </Field>
           <Button type="submit" className="w-full" size="lg">
             Enviarme el enlace mágico
           </Button>

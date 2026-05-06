@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SessionProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-dvh flex flex-col">
         <Nav user={user} />
         <main className="container flex-1 py-8 md:py-12">{children}</main>
         <footer className="border-t border-border/60 py-6">

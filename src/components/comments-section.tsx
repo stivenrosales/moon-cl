@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label, Field } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { postComment, deleteComment, moderateComment } from "@/server/actions/comments";
@@ -39,12 +40,11 @@ export function CommentsSection({ bookId, comments, currentUserId, isModerator }
   return (
     <div className="space-y-6">
       <CommentComposer bookId={bookId} />
+
       {comments.length === 0 ? (
-        <p className="rounded-2xl border border-border/60 bg-card/40 p-8 text-center text-sm text-muted-foreground">
-          Sé la primera en comentar.
-        </p>
+        <EmptyComments />
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {comments.map((c) => (
             <CommentItem
               key={c.id}
@@ -60,19 +60,35 @@ export function CommentsSection({ bookId, comments, currentUserId, isModerator }
   );
 }
 
+function EmptyComments() {
+  return (
+    <div className="rounded-2xl border border-dashed border-border/60 bg-card/30 p-8 text-center">
+      <p className="hand-script text-2xl text-primary">silencio bajo la luna</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Sé la primera en compartir una impresión.
+      </p>
+    </div>
+  );
+}
+
 function CommentComposer({
   bookId,
   parentId,
   onDone,
+  onCancel,
+  autoFocus,
 }: {
   bookId: string;
   parentId?: string;
   onDone?: () => void;
+  onCancel?: () => void;
+  autoFocus?: boolean;
 }) {
   const [content, setContent] = React.useState("");
   const [chapter, setChapter] = React.useState<string>("");
   const [isSpoiler, setIsSpoiler] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const isReply = !!parentId;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,7 +102,7 @@ function CommentComposer({
         isSpoiler,
         chapter: chapter ? Number(chapter) : null,
       });
-      toast.success(parentId ? "Respuesta publicada" : "Comentario publicado");
+      toast.success(isReply ? "Respuesta publicada" : "Comentario publicado");
       setContent("");
       setChapter("");
       setIsSpoiler(false);
@@ -99,40 +115,65 @@ function CommentComposer({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border/60 bg-card/50 p-4">
+    <form
+      onSubmit={onSubmit}
+      className={cn(
+        "space-y-4 rounded-2xl border bg-card/40 p-4 sm:p-5",
+        isReply ? "border-primary/30 bg-primary/[0.04]" : "border-border/60",
+      )}
+    >
       <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder={parentId ? "Tu respuesta..." : "Comparte una impresión, una cita, una pregunta..."}
+        placeholder={
+          isReply
+            ? "Tu respuesta…"
+            : "Comparte una impresión, una cita, una pregunta…"
+        }
         maxLength={4000}
-        rows={parentId ? 2 : 3}
+        rows={isReply ? 2 : 3}
+        autoFocus={autoFocus}
+        aria-label={isReply ? "Tu respuesta" : "Tu comentario"}
       />
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor={`chapter-${parentId ?? "root"}`}>Capítulo</Label>
+
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <Field className="w-24 space-y-1.5">
+          <Label htmlFor={`chapter-${parentId ?? "root"}`} optional>Cap.</Label>
           <Input
             id={`chapter-${parentId ?? "root"}`}
             type="number"
+            inputMode="numeric"
             min={1}
+            max={9999}
             value={chapter}
             onChange={(e) => setChapter(e.target.value)}
             placeholder="—"
-            className="w-24"
+            className="h-10 text-center"
           />
+        </Field>
+
+        <Checkbox
+          checked={isSpoiler}
+          onChange={(e) => setIsSpoiler(e.currentTarget.checked)}
+          label="Marcar como spoiler"
+          className="self-end"
+        />
+
+        <div className="ml-auto flex items-center gap-2 self-end">
+          {onCancel ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              Cancelar
+            </Button>
+          ) : null}
+          <Button type="submit" disabled={submitting || !content.trim()} size="sm">
+            {submitting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MessageCircle className="h-3.5 w-3.5" />
+            )}
+            {isReply ? "Responder" : "Publicar"}
+          </Button>
         </div>
-        <label className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground select-none cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isSpoiler}
-            onChange={(e) => setIsSpoiler(e.target.checked)}
-            className="h-4 w-4 accent-primary"
-          />
-          Marcar como spoiler
-        </label>
-        <Button type="submit" disabled={submitting} size="sm" className="ml-auto">
-          {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-          {parentId ? "Responder" : "Comentar"}
-        </Button>
       </div>
     </form>
   );
@@ -184,28 +225,39 @@ function CommentItem({
   }
 
   return (
-    <li className={cn("group", isReply && "ml-6 md:ml-10")}>
-      <article className="rounded-2xl border border-border/60 bg-card/50 p-4">
+    <li className={cn("group", isReply && "ml-5 sm:ml-10")}>
+      <article
+        className={cn(
+          "rounded-2xl border bg-card/50 p-4 sm:p-5 transition-colors",
+          isReply
+            ? "border-border/40 bg-card/30"
+            : "border-border/60",
+        )}
+      >
         <header className="flex items-start gap-3">
-          <Avatar className="h-8 w-8 shrink-0">
+          <Avatar className={cn(isReply ? "h-7 w-7" : "h-9 w-9", "shrink-0")}>
             {comment.user.image ? <AvatarImage src={comment.user.image} alt="" /> : null}
-            <AvatarFallback>{getInitials(comment.user.name, comment.user.email)}</AvatarFallback>
+            <AvatarFallback className={isReply ? "text-[10px]" : "text-xs"}>
+              {getInitials(comment.user.name, comment.user.email)}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">{comment.user.name ?? comment.user.email?.split("@")[0]}</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-sm font-medium leading-none">
+                {comment.user.name ?? comment.user.email?.split("@")[0]}
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80">
                 {relativeTime(comment.createdAt)}
               </span>
               {comment.chapter ? (
-                <Badge variant="outline">Cap. {comment.chapter}</Badge>
+                <Badge variant="outline" className="text-[9px]">Cap. {comment.chapter}</Badge>
               ) : null}
               {comment.isSpoiler && !isDeleted ? (
-                <Badge variant="default">Spoiler</Badge>
+                <Badge variant="default" className="text-[9px]">Spoiler</Badge>
               ) : null}
             </div>
 
-            <div className="relative mt-2">
+            <div className="relative mt-2.5">
               <p
                 className={cn(
                   "whitespace-pre-wrap text-sm leading-relaxed",
@@ -219,10 +271,12 @@ function CommentItem({
                 <button
                   type="button"
                   onClick={() => setRevealed(true)}
-                  className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-sm rounded-md text-xs uppercase tracking-[0.22em] text-primary hover:bg-background/50 transition-colors"
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-lg bg-background/50 backdrop-blur-sm hover:bg-background/70 transition-colors group/spoiler"
                 >
-                  <Eye className="mr-2 h-3.5 w-3.5" />
-                  Revelar spoiler
+                  <Eye className="h-4 w-4 text-primary group-hover/spoiler:scale-110 transition-transform" />
+                  <span className="text-xs text-primary font-medium">
+                    Revelar spoiler
+                  </span>
                 </button>
               ) : null}
             </div>
@@ -230,15 +284,27 @@ function CommentItem({
         </header>
 
         {!isDeleted ? (
-          <footer className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+          <footer className="mt-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             {!isReply ? (
-              <Button variant="ghost" size="sm" onClick={() => setReplying((v) => !v)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReplying((v) => !v)}
+                className="text-muted-foreground hover:text-foreground"
+                aria-pressed={replying}
+              >
                 <Reply className="h-3.5 w-3.5" />
-                Responder
+                {replying ? "Cancelar" : "Responder"}
               </Button>
             ) : null}
             {isModerator ? (
-              <Button variant="ghost" size="sm" onClick={toggleSpoiler} disabled={pending}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleSpoiler}
+                disabled={pending}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 {comment.isSpoiler ? (
                   <>
                     <EyeOff className="h-3.5 w-3.5" /> Quitar spoiler
@@ -256,7 +322,7 @@ function CommentItem({
                 size="sm"
                 onClick={onDelete}
                 disabled={pending}
-                className="hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Borrar
@@ -266,11 +332,13 @@ function CommentItem({
         ) : null}
 
         {replying && !isReply ? (
-          <div className="mt-3">
+          <div className="mt-4">
             <CommentComposer
               bookId={bookId}
               parentId={comment.id}
               onDone={() => setReplying(false)}
+              onCancel={() => setReplying(false)}
+              autoFocus
             />
           </div>
         ) : null}

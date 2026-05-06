@@ -44,7 +44,7 @@ export default async function AdminPage() {
   const bookOptions = books.map((b) => ({ id: b.id, title: b.title }));
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 md:space-y-10">
       <header>
         <span className="text-xs uppercase tracking-[0.32em] text-accent">Cabina del club</span>
         <h1 className="h1-display display mt-2">

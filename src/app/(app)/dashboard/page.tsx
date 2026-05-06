@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     currentBook && myProgress?.bookId === currentBook.id ? myProgress : null;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 md:space-y-10">
       <header className="space-y-2 animate-fade-up">
         <span className="text-xs uppercase tracking-[0.32em] text-accent">
           {greet()}, {session.user.name ?? session.user.email?.split("@")[0]}

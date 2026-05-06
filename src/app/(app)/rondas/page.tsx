@@ -26,7 +26,7 @@ export default async function RondasPage() {
   const closed = rounds.filter((r) => r.status === "CLOSED");
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 md:space-y-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="text-xs uppercase tracking-[0.32em] text-accent">El club elige</span>

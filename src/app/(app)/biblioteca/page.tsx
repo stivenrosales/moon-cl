@@ -21,7 +21,7 @@ export default async function BibliotecaPage() {
   const others = books.filter((b) => !b.isCurrent && b.status !== "FINISHED");
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 md:space-y-10">
       <header>
         <span className="text-xs uppercase tracking-[0.32em] text-accent">Memoria del club</span>
         <h1 className="h1-display display mt-2">

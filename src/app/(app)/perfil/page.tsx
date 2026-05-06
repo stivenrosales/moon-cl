@@ -41,7 +41,7 @@ export default async function PerfilPage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-7">
       <header className="flex flex-col md:flex-row items-start gap-6">
         <Avatar className="h-20 w-20">
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}

@@ -70,7 +70,7 @@ export default async function BookPage({
   const isModerator = isModeratorOrAbove(session.user.role);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-7">
       <Link
         href="/biblioteca"
         className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.24em] text-muted-foreground hover:text-foreground"

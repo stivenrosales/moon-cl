@@ -42,7 +42,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-7">
       <Link
         href="/reuniones"
         className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.24em] text-muted-foreground hover:text-foreground"

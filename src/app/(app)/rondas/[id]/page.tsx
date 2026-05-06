@@ -46,7 +46,7 @@ export default async function RondaPage({
   const totalVotes = round.suggestions.reduce((acc, s) => acc + s._count.votes, 0);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-7">
       <Link
         href="/rondas"
         className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.24em] text-muted-foreground hover:text-foreground"

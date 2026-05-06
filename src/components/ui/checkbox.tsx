@@ -24,13 +24,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       <label
         htmlFor={inputId}
         className={cn(
-          "group inline-flex items-start gap-3 py-1.5 cursor-pointer select-none",
-          "min-h-[44px]",
+          "group inline-flex items-center gap-2.5 py-1 cursor-pointer select-none",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
       >
-        <span className="relative inline-flex h-5 w-5 shrink-0 mt-0.5 items-center justify-center">
+        <span className="relative inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
           <input
             ref={ref}
             id={inputId}
@@ -44,7 +43,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           <span
             aria-hidden
             className={cn(
-              "absolute inset-0 rounded-md border transition-all",
+              "absolute inset-0 rounded-[5px] border transition-all",
               "border-input bg-background/50",
               "peer-checked:border-primary peer-checked:bg-primary",
               "peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background",
@@ -54,16 +53,16 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           <Check
             aria-hidden
             className={cn(
-              "relative h-3.5 w-3.5 text-primary-foreground transition-opacity",
+              "relative h-3 w-3 text-primary-foreground transition-opacity",
               "opacity-0 peer-checked:opacity-100",
             )}
           />
         </span>
         {(label || description) && (
-          <span className="flex flex-col gap-0.5 leading-snug">
-            {label ? <span className="text-sm font-medium">{label}</span> : null}
+          <span className="flex flex-col leading-snug">
+            {label ? <span className="text-sm">{label}</span> : null}
             {description ? (
-              <span className="text-xs text-muted-foreground/80">{description}</span>
+              <span className="text-xs text-muted-foreground/80 mt-0.5">{description}</span>
             ) : null}
           </span>
         )}

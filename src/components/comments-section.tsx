@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Label, Field } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -38,13 +37,13 @@ interface CommentsSectionProps {
 
 export function CommentsSection({ bookId, comments, currentUserId, isModerator }: CommentsSectionProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <CommentComposer bookId={bookId} />
 
       {comments.length === 0 ? (
         <EmptyComments />
       ) : (
-        <ul className="space-y-3">
+        <ul className="divide-y divide-border/30">
           {comments.map((c) => (
             <CommentItem
               key={c.id}
@@ -62,9 +61,9 @@ export function CommentsSection({ bookId, comments, currentUserId, isModerator }
 
 function EmptyComments() {
   return (
-    <div className="rounded-2xl border border-dashed border-border/60 bg-card/30 p-8 text-center">
+    <div className="py-10 text-center">
       <p className="hand-script text-2xl text-primary">silencio bajo la luna</p>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         Sé la primera en compartir una impresión.
       </p>
     </div>
@@ -118,8 +117,8 @@ function CommentComposer({
     <form
       onSubmit={onSubmit}
       className={cn(
-        "space-y-3 rounded-2xl border bg-card/40 p-3 sm:p-4",
-        isReply ? "border-primary/30 bg-primary/[0.04]" : "border-border/60",
+        "space-y-2.5 rounded-xl border p-2.5 sm:p-3",
+        isReply ? "border-primary/25 bg-primary/[0.03]" : "border-border/40 bg-card/30",
       )}
     >
       <Textarea
@@ -134,7 +133,7 @@ function CommentComposer({
         rows={2}
         autoFocus={autoFocus}
         aria-label={isReply ? "Tu respuesta" : "Tu comentario"}
-        className="min-h-[68px]"
+        className="min-h-[64px] border-0 bg-transparent px-2 py-1.5 focus-visible:ring-0"
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -223,139 +222,129 @@ function CommentItem({
   }
 
   return (
-    <li className={cn("group", isReply && "ml-5 sm:ml-10")}>
-      <article
-        className={cn(
-          "rounded-2xl border bg-card/50 p-3.5 sm:p-4 transition-colors",
-          isReply
-            ? "border-border/40 bg-card/30"
-            : "border-border/60",
-        )}
-      >
-        <header className="flex items-start gap-2.5">
-          <Avatar className={cn(isReply ? "h-7 w-7" : "h-8 w-8", "shrink-0")}>
-            {comment.user.image ? <AvatarImage src={comment.user.image} alt="" /> : null}
-            <AvatarFallback className={isReply ? "text-[10px]" : "text-[11px]"}>
-              {getInitials(comment.user.name, comment.user.email)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-sm font-medium leading-snug">
-                {comment.user.name ?? comment.user.email?.split("@")[0]}
+    <li className="py-3 first:pt-1 last:pb-1">
+      <article className="flex gap-3">
+        <Avatar className={cn("shrink-0", isReply ? "h-6 w-6" : "h-7 w-7")}>
+          {comment.user.image ? <AvatarImage src={comment.user.image} alt="" /> : null}
+          <AvatarFallback className={isReply ? "text-[9px]" : "text-[10px]"}>
+            {getInitials(comment.user.name, comment.user.email)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-sm font-medium leading-snug">
+              {comment.user.name ?? comment.user.email?.split("@")[0]}
+            </span>
+            <span className="text-[11px] text-muted-foreground/70">
+              {relativeTime(comment.createdAt)}
+            </span>
+            {comment.chapter ? (
+              <span className="text-[10px] text-muted-foreground/70">
+                · cap. {comment.chapter}
               </span>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                {relativeTime(comment.createdAt)}
-              </span>
-              {comment.chapter ? (
-                <Badge variant="outline" className="text-[9px] py-0">Cap. {comment.chapter}</Badge>
-              ) : null}
-              {comment.isSpoiler && !isDeleted ? (
-                <Badge variant="default" className="text-[9px] py-0">Spoiler</Badge>
-              ) : null}
-            </div>
+            ) : null}
+            {comment.isSpoiler && !isDeleted ? (
+              <Badge variant="default" className="text-[9px] py-0">Spoiler</Badge>
+            ) : null}
+          </div>
 
-            <div className="relative mt-1.5">
-              <p
-                className={cn(
-                  "whitespace-pre-wrap text-sm leading-relaxed",
-                  showSpoilerOverlay && "blur-md select-none",
-                  isDeleted && "italic text-muted-foreground",
-                )}
+          <div className="relative mt-1">
+            <p
+              className={cn(
+                "whitespace-pre-wrap text-sm leading-relaxed",
+                showSpoilerOverlay && "blur-md select-none",
+                isDeleted && "italic text-muted-foreground",
+              )}
+            >
+              {comment.content}
+            </p>
+            {showSpoilerOverlay ? (
+              <button
+                type="button"
+                onClick={() => setRevealed(true)}
+                className="absolute inset-0 flex items-center justify-center gap-2 rounded-md bg-background/50 backdrop-blur-sm hover:bg-background/70 transition-colors group/spoiler"
               >
-                {comment.content}
-              </p>
-              {showSpoilerOverlay ? (
+                <Eye className="h-4 w-4 text-primary group-hover/spoiler:scale-110 transition-transform" />
+                <span className="text-xs text-primary font-medium">
+                  Revelar spoiler
+                </span>
+              </button>
+            ) : null}
+          </div>
+
+          {!isDeleted ? (
+            <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
+              {!isReply ? (
                 <button
                   type="button"
-                  onClick={() => setRevealed(true)}
-                  className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg bg-background/50 backdrop-blur-sm hover:bg-background/70 transition-colors group/spoiler"
+                  onClick={() => setReplying((v) => !v)}
+                  className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  aria-pressed={replying}
                 >
-                  <Eye className="h-4 w-4 text-primary group-hover/spoiler:scale-110 transition-transform" />
-                  <span className="text-xs text-primary font-medium">
-                    Revelar spoiler
-                  </span>
+                  <Reply className="h-3 w-3" />
+                  {replying ? "Cancelar" : "Responder"}
+                </button>
+              ) : null}
+              {isModerator ? (
+                <button
+                  type="button"
+                  onClick={toggleSpoiler}
+                  disabled={pending}
+                  className="inline-flex items-center gap-1 hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {comment.isSpoiler ? (
+                    <>
+                      <EyeOff className="h-3 w-3" /> Quitar spoiler
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-3 w-3" /> Marcar spoiler
+                    </>
+                  )}
+                </button>
+              ) : null}
+              {canDelete ? (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={pending}
+                  className="inline-flex items-center gap-1 hover:text-destructive transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Borrar
                 </button>
               ) : null}
             </div>
-          </div>
-        </header>
+          ) : null}
 
-        {!isDeleted ? (
-          <footer className="mt-2.5 -ml-2 flex items-center gap-0 text-xs text-muted-foreground">
-            {!isReply ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setReplying((v) => !v)}
-                className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                aria-pressed={replying}
-              >
-                <Reply className="h-3.5 w-3.5" />
-                {replying ? "Cancelar" : "Responder"}
-              </Button>
-            ) : null}
-            {isModerator ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleSpoiler}
-                disabled={pending}
-                className="h-8 px-2 text-muted-foreground hover:text-foreground"
-              >
-                {comment.isSpoiler ? (
-                  <>
-                    <EyeOff className="h-3.5 w-3.5" /> Quitar spoiler
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-3.5 w-3.5" /> Marcar spoiler
-                  </>
-                )}
-              </Button>
-            ) : null}
-            {canDelete ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDelete}
-                disabled={pending}
-                className="h-8 px-2 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Borrar
-              </Button>
-            ) : null}
-          </footer>
-        ) : null}
+          {replying && !isReply ? (
+            <div className="mt-2.5">
+              <CommentComposer
+                bookId={bookId}
+                parentId={comment.id}
+                onDone={() => setReplying(false)}
+                onCancel={() => setReplying(false)}
+                autoFocus
+              />
+            </div>
+          ) : null}
 
-        {replying && !isReply ? (
-          <div className="mt-3">
-            <CommentComposer
-              bookId={bookId}
-              parentId={comment.id}
-              onDone={() => setReplying(false)}
-              onCancel={() => setReplying(false)}
-              autoFocus
-            />
-          </div>
-        ) : null}
+          {!isReply && comment.replies && comment.replies.length > 0 ? (
+            <ul className="mt-3 border-l border-border/40 pl-4">
+              {comment.replies.map((r) => (
+                <CommentItem
+                  key={r.id}
+                  bookId={bookId}
+                  comment={r}
+                  currentUserId={currentUserId}
+                  isModerator={isModerator}
+                  isReply
+                />
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </article>
-
-      {comment.replies.length > 0 ? (
-        <ul className="mt-3 space-y-3">
-          {comment.replies.map((r) => (
-            <CommentItem
-              key={r.id}
-              bookId={bookId}
-              comment={r}
-              currentUserId={currentUserId}
-              isModerator={isModerator}
-              isReply
-            />
-          ))}
-        </ul>
-      ) : null}
     </li>
   );
 }

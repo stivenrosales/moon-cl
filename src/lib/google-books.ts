@@ -84,8 +84,13 @@ async function searchGoogleBooks(query: string, max: number): Promise<BookCandid
   }
 
   const res = await fetch(`${GB_ENDPOINT}?${params.toString()}`, {
-    next: { revalidate: 3600 },
+    cache: "no-store",
   });
+  if (res.status === 429 && process.env.NODE_ENV !== "production") {
+    // Quota anónima de Google Books quemada — configura GOOGLE_BOOKS_API_KEY.
+    // eslint-disable-next-line no-console
+    console.warn("[google-books] 429 quota exceeded — set GOOGLE_BOOKS_API_KEY");
+  }
   if (!res.ok) return [];
 
   const data = (await res.json()) as { items?: GBVolumeItem[] };
@@ -160,7 +165,7 @@ async function searchOpenLibrary(query: string, max: number): Promise<BookCandid
     headers: {
       "User-Agent": "MoonClubDeLectura/1.0 (+https://github.com/stivenrosales/moon-cl)",
     },
-    next: { revalidate: 3600 },
+    cache: "no-store",
   });
   if (!res.ok) return [];
 

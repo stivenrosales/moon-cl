@@ -4,18 +4,80 @@ import { ArrowLeft, BookOpen, MessageSquare, Star, Users } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/book-cover";
+import { BookTabsProvider } from "@/components/book-tabs-provider";
 import { ProgressForm } from "@/components/progress-form";
 import { RatingForm } from "@/components/rating-form";
+import { RatingHistogram } from "@/components/rating-histogram";
 import { StarRating } from "@/components/star-rating";
 import { CommentsSection, type CommentNode } from "@/components/comments-section";
 import { BookEditDialog } from "@/components/book-edit-dialog";
 import { formatDate, getInitials, pageProgress, relativeTime } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
+import { gateComment, hasFinishedBook } from "@/server/services/comment-gating";
+
+interface RawCommentUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
+interface RawComment {
+  id: string;
+  userId: string;
+  content: string;
+  isSpoiler: boolean;
+  isReflection: boolean;
+  chapter: number | null;
+  createdAt: Date;
+  deletedAt: Date | null;
+  user: RawCommentUser;
+  replies?: RawComment[];
+}
+
+interface GateCtx {
+  currentUserId: string;
+  myChapter: number;
+  isModerator: boolean;
+  hasFinishedBook: boolean;
+}
+
+/**
+ * Aplica el gating server-side (fix del leak: antes el blur de spoilers era
+ * solo CSS y el content viajaba igual en el HTML). Un comentario bloqueado
+ * NUNCA lleva `content` en el payload que llega al cliente — solo metadata
+ * (capítulo, autor, fecha) necesaria para agrupar en salas y mostrar el
+ * motivo del bloqueo. El contenido real solo viaja bajo demanda vía la
+ * action revealComment.
+ */
+function serializeComment(c: RawComment, ctx: GateCtx): CommentNode {
+  const decision = gateComment(
+    { authorId: c.userId, chapter: c.chapter, isSpoiler: c.isSpoiler, isReflection: c.isReflection },
+    ctx,
+  );
+  const replies = (c.replies ?? []).map((r) => serializeComment(r, ctx));
+
+  const base = {
+    id: c.id,
+    chapter: c.chapter,
+    isSpoiler: c.isSpoiler,
+    isReflection: c.isReflection,
+    createdAt: c.createdAt,
+    user: c.user,
+    replies,
+  };
+
+  if (decision.locked) {
+    return { ...base, locked: true, reason: decision.reason };
+  }
+
+  return { ...base, locked: false, content: c.content, deletedAt: c.deletedAt };
+}
 
 export default async function BookPage({
   params,
@@ -27,30 +89,36 @@ export default async function BookPage({
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
-  const book = await db.book.findUnique({
-    where: { id },
-    include: {
-      progressUpdates: {
-        orderBy: { createdAt: "desc" },
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
-      },
-      ratings: {
-        include: { user: { select: { id: true, name: true, email: true, image: true } } },
-      },
-      meetings: { orderBy: { startsAt: "asc" } },
-      comments: {
-        where: { parentId: null },
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: { select: { id: true, name: true, email: true, image: true } },
-          replies: {
-            orderBy: { createdAt: "asc" },
-            include: { user: { select: { id: true, name: true, email: true, image: true } } },
+  const [book, myUserBook] = await Promise.all([
+    db.book.findUnique({
+      where: { id },
+      include: {
+        progressUpdates: {
+          orderBy: { createdAt: "desc" },
+          include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        },
+        ratings: {
+          include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        },
+        meetings: { orderBy: { startsAt: "asc" } },
+        comments: {
+          where: { parentId: null },
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: { select: { id: true, name: true, email: true, image: true } },
+            replies: {
+              orderBy: { createdAt: "asc" },
+              include: { user: { select: { id: true, name: true, email: true, image: true } } },
+            },
           },
         },
       },
-    },
-  });
+    }),
+    db.userBook.findUnique({
+      where: { userId_bookId: { userId, bookId: id } },
+      select: { status: true },
+    }),
+  ]);
 
   if (!book) notFound();
 
@@ -69,6 +137,19 @@ export default async function BookPage({
     : 0;
 
   const isModerator = isModeratorOrAbove(session.user.role);
+  const myChapter = myLatest?.chapter ?? 0;
+  const iHaveFinishedBook = hasFinishedBook({
+    userBookStatus: myUserBook?.status ?? null,
+    latestProgressPage: myLatest?.currentPage ?? null,
+    bookPageCount: book.pageCount ?? null,
+  });
+  const gateCtx: GateCtx = {
+    currentUserId: userId,
+    myChapter,
+    isModerator,
+    hasFinishedBook: iHaveFinishedBook,
+  };
+  const gatedComments = book.comments.map((c) => serializeComment(c, gateCtx));
 
   return (
     <div className="space-y-5 md:space-y-6">
@@ -206,7 +287,7 @@ export default async function BookPage({
         </div>
       </header>
 
-      <Tabs defaultValue={book.isCurrent ? "progress" : "ratings"}>
+      <BookTabsProvider defaultValue={book.isCurrent ? "progress" : "ratings"}>
         <TabsList className="w-full grid sm:inline-flex sm:w-auto" style={{ gridTemplateColumns: book.isCurrent ? "repeat(3, minmax(0, 1fr))" : "repeat(1, minmax(0, 1fr))" }}>
           {book.isCurrent ? (
             <>
@@ -246,6 +327,7 @@ export default async function BookPage({
                   bookId={book.id}
                   totalPages={book.pageCount}
                   initialPage={myLatest?.currentPage ?? 0}
+                  initialChapter={myLatest?.chapter ?? null}
                 />
               </div>
             </Card>
@@ -295,12 +377,19 @@ export default async function BookPage({
         ) : null}
 
         {book.isCurrent ? (
-          <TabsContent value="comments">
+          <TabsContent value="comments" className="space-y-5">
+            {book.ratings.length ? (
+              <Card className="p-4">
+                <RatingHistogram ratings={book.ratings} />
+              </Card>
+            ) : null}
             <CommentsSection
               bookId={book.id}
-              comments={book.comments as unknown as CommentNode[]}
+              comments={gatedComments}
               currentUserId={userId}
               isModerator={isModerator}
+              myChapter={myChapter}
+              hasFinishedBook={iHaveFinishedBook}
             />
           </TabsContent>
         ) : null}
@@ -360,7 +449,7 @@ export default async function BookPage({
             )}
           </div>
         </TabsContent>
-      </Tabs>
+      </BookTabsProvider>
     </div>
   );
 }

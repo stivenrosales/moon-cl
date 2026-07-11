@@ -14,6 +14,8 @@ import { MeetingEditDialog } from "@/components/admin/meeting-edit-dialog";
 import { MEETING_TYPE_LABELS, MEETING_TYPE_BADGE_VARIANT } from "@/lib/meeting-types";
 import { RoleSelect } from "@/components/admin/role-select";
 import { BookStateButtons } from "@/components/admin/book-state-buttons";
+import { NewKahootActivityForm } from "@/components/admin/kahoot-activity-form";
+import { KahootActivityActions } from "@/components/admin/kahoot-activity-actions";
 import { formatDate, getInitials } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 
@@ -25,8 +27,12 @@ export default async function AdminPage() {
   if (!isModeratorOrAbove(session.user.role)) redirect("/dashboard");
 
   const isAdmin = session.user.role === "ADMIN";
+  // isModeratorOrAbove ya filtró en el redirect de arriba: quien llega acá
+  // es MODERATOR o ADMIN. Las secciones de moderación (Kahoot) se muestran
+  // a ambos; las de ADMIN (rondas, reuniones, libros, roles) siguen atadas
+  // a isAdmin porque sus server actions exigen requireAdmin.
 
-  const [rounds, books, users, meetings] = await Promise.all([
+  const [rounds, books, users, meetings, kahootActivities] = await Promise.all([
     db.round.findMany({
       orderBy: [{ status: "asc" }, { startsAt: "desc" }],
       include: { _count: { select: { suggestions: true } } },
@@ -41,9 +47,24 @@ export default async function AdminPage() {
       take: 20,
       include: { _count: { select: { rsvps: true } } },
     }),
+    db.kahootActivity.findMany({
+      orderBy: { playedAt: "desc" },
+      take: 20,
+      include: {
+        meeting: { select: { id: true, title: true } },
+        scores: { select: { userId: true, points: true, correctAnswers: true } },
+      },
+    }),
   ]);
 
   const bookOptions = books.map((b) => ({ id: b.id, title: b.title }));
+  const meetingOptions = meetings.map((m) => ({ id: m.id, title: m.title }));
+  const memberOptions = users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    image: u.image,
+  }));
 
   return (
     <div className="space-y-8 md:space-y-10">
@@ -137,6 +158,57 @@ export default async function AdminPage() {
           </div>
         </section>
       ) : null}
+
+      {/* Kahoot — sección de moderación: visible para MODERATOR y ADMIN,
+          igual que permite createKahootActivity/updateKahootScore. Solo
+          borrar una actividad completa (deleteKahootActivity) exige admin,
+          y eso se resuelve dentro de KahootActivityActions. */}
+      <section id="kahoot" className="space-y-4">
+        <h2 className="display text-2xl">Kahoot</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-6">
+          <Card className="p-6">
+            <h3 className="text-xs uppercase tracking-[0.32em] text-muted-foreground">Nueva actividad</h3>
+            <div className="mt-4">
+              <NewKahootActivityForm members={memberOptions} meetings={meetingOptions} />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h3 className="text-xs uppercase tracking-[0.32em] text-muted-foreground">Existentes</h3>
+            {kahootActivities.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">Aún no hay actividades de Kahoot.</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-border/60">
+                {kahootActivities.map((k) => {
+                  const totalPoints = k.scores.reduce((sum, s) => sum + s.points, 0);
+                  const initialScores = Object.fromEntries(
+                    k.scores.map((s) => [s.userId, { points: s.points, correctAnswers: s.correctAnswers }]),
+                  );
+                  return (
+                    <li key={k.id} className="py-3 space-y-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-medium truncate max-w-[220px]">{k.title}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(k.playedAt)}</span>
+                        {k.meeting ? <Badge variant="secondary">{k.meeting.title}</Badge> : null}
+                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                          {k.scores.length} jugador{k.scores.length === 1 ? "" : "es"} · {totalPoints} pts
+                        </span>
+                      </div>
+                      <KahootActivityActions
+                        activityId={k.id}
+                        title={k.title}
+                        isAdmin={isAdmin}
+                        members={memberOptions}
+                        initialScores={initialScores}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </div>
+      </section>
 
       {/* Libros */}
       {isAdmin ? (

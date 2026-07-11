@@ -81,11 +81,11 @@ Lista de cambios de schema conocidos, para secuenciarlos aplicando el procedimie
 3. ~~`Book.categories` — columna nueva en `Book` (`String[]`, igual que `authors`), aditivo simple.~~ **Ya escrito en `schema.prisma`, ver sección 6 (Lote 2).**
 4. ~~`ReadingProgress.chapter` — columna opcional nueva, aditivo simple.~~ **Ya escrito en `schema.prisma`, ver sección 6 (Lote 2).**
 5. ~~`Meeting`: introducir `MeetingType` (enum) + `remindedAt`.~~ **Ya escrito en `schema.prisma`, ver sección 6 (Lote 2).**
-6. `Quote` (modelo nuevo) — tabla nueva con relación a `Book`/`User`, aditivo (no afecta modelos existentes salvo agregar la relación inversa). **Pendiente, no incluido en Lote 2.**
-7. `Follow` (modelo nuevo) — tabla nueva de relación `User`-`User` (follower/followed), aditivo. **Pendiente, no incluido en Lote 2.**
-8. `Message` (modelo nuevo) — tabla nueva, aditivo. Evaluar si depende de `Follow` (mensajería entre usuarios que se siguen) para decidir si va antes o después del punto 7. **Pendiente, no incluido en Lote 2.**
+6. `Quote` (modelo nuevo) — tabla nueva con relación a `Book`/`User`, aditivo (no afecta modelos existentes salvo agregar la relación inversa). **Ya escrito en `schema.prisma`, ver sección 7 (Lote 3).**
+7. `Follow` (modelo nuevo) — tabla nueva de relación `User`-`User` (follower/followed), aditivo. **Ya escrito en `schema.prisma`, ver sección 7 (Lote 3).**
+8. `Message` (modelo nuevo) — tabla nueva, aditivo. No tiene FK hacia `Follow` en el schema; el código de DMs (próxima tanda) decidirá si restringe el envío a usuarios que se siguen. **Ya escrito en `schema.prisma`, ver sección 7 (Lote 3).**
 9. ~~`UserBook` / estanterías — modelo nuevo.~~ **Ya escrito en `schema.prisma`, ver sección 6 (Lote 2).** Convive con `ReadingProgress`/`Rating` sin reemplazarlas; no migra datos existentes.
-10. Modelos de **Kahoot** (quiz/trivia) — el de mayor superficie nueva (probablemente varios modelos: sesión, preguntas, respuestas, participantes). Ir al final del roadmap de schema porque es la funcionalidad más nueva y con más relaciones a definir; conviene que el resto del dominio esté estable antes de diseñarlo. **Pendiente, no incluido en Lote 2.**
+10. Modelos de **Kahoot** (quiz/trivia) — `KahootActivity` + `KahootScore`. **Ya escrito en `schema.prisma`, ver sección 7 (Lote 3).**
 
 Cada uno de estos cambios debe pasar por su propio ciclo: editar `schema.prisma` → `npx prisma format` → `npx prisma validate` → (una vez adoptado `migrate`) `prisma migrate dev --name <nombre>` → aplicar a producción siguiendo la sección 3 → deployar el código que lo consume.
 
@@ -124,3 +124,28 @@ DATABASE_URL="<url de produccion>" npx prisma db push
 ```
 
 Verificar después con `npx prisma validate` (contra el schema) y una consulta puntual (o `prisma studio`) de que `UserBook`, los enums `MeetingType`/`ShelfStatus` y las columnas nuevas existen en producción, antes de deployar el código que dependa de ellas (según el orden de la sección 3).
+
+## 7. Lote 3 — pendiente
+
+Este lote agrupa **todos los modelos restantes del roadmap de schema** (puntos 6-8 y 10 de la sección 4), escritos en una sola pasada en `prisma/schema.prisma` y verificados localmente con `npx prisma format` + `npx prisma generate` + `npx prisma validate` (con `DATABASE_URL` dummy) — los 168 tests con mocks siguen en verde. **Ninguno de estos cambios está aplicado todavía en la base de datos real.** El código que los consume (fuera de este cambio, que es solo schema) compilará y sus tests con mocks pasarán, pero cualquier ruta que lea/escriba estos campos romperá en runtime contra producción hasta que un humano corra `db push` contra la base real.
+
+Todo es aditivo — modelos nuevos, sin tocar columnas ni tablas existentes salvo dos columnas nuevas con `@default(...)` (`Comment.isReflection`, `User.isMatchOptIn`) — así que **puede aplicarse en un único `db push` junto con el Lote 2** (sección 6), sin downtime, siguiendo igualmente el procedimiento de la sección 3.
+
+Modelos y columnas agregados:
+
+1. `model Follow` — grafo social (`followerId`, `followingId`, `createdAt`), relaciones explícitas `UserFollows`/`UserFollowedBy` hacia `User` con `onDelete: Cascade`, `@@unique([followerId, followingId])`, `@@index([followingId])`. La regla anti-auto-follow (`followerId !== followingId`) se valida en la server action — Prisma no soporta check constraints portables.
+2. `model Quote` — citas de un libro (`bookId`, `userId`, `content` `@db.Text`, `page?`, `chapter?`, `createdAt`), Cascade hacia `Book`/`User`, `@@index([bookId])`, `@@index([userId])`.
+3. `model QuoteLike` — likes de citas (`quoteId`, `userId`, `createdAt`), Cascade, `@@unique([quoteId, userId])`.
+4. `model Message` — mensajería directa (`senderId`, `receiverId`, `content` `@db.Text`, `readAt?`, `createdAt`), relaciones explícitas `MessageSender`/`MessageReceiver` hacia `User` con Cascade, `@@index([senderId, receiverId])`, `@@index([receiverId, readAt])`. El código de DMs (bandeja, envío, marcar leído) llega en la próxima tanda; el schema va ahora para agrupar el `db push`.
+5. `model KahootActivity` — actividad de Kahoot (`title`, `description?` `@db.Text`, `playedAt`, `meetingId?` con `onDelete: SetNull`, `creatorId?`, `createdAt`), `@@index([meetingId])`, `@@index([creatorId])`.
+6. `model KahootScore` — puntaje por usuario y actividad (`activityId`, `userId`, `points`, `correctAnswers?`, `createdAt`), Cascade, `@@unique([activityId, userId])`, `@@index([userId])`.
+7. `Comment.isReflection Boolean @default(false)` — marca los comentarios de la «Sala de reflexión (spoilers totales)» del foro, separada de las salas por capítulo.
+8. `User.isMatchOptIn Boolean @default(false)` — opt-in para Book Match (próxima tanda).
+
+Aplicación (junto con el Lote 2, un solo `db push`):
+
+```bash
+DATABASE_URL="<url de produccion>" npx prisma db push
+```
+
+Verificar después con `npx prisma validate` y una consulta puntual (o `prisma studio`) de que `Follow`, `Quote`, `QuoteLike`, `Message`, `KahootActivity`, `KahootScore` y las columnas nuevas existen en producción, antes de deployar el código que dependa de ellas (según el orden de la sección 3).

@@ -23,20 +23,29 @@ model User {
   favoriteGenres String[]  @default([])
   ageConfirmedAt DateTime?
   onboardedAt    DateTime?
+  isMatchOptIn   Boolean   @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  accounts        Account[]
-  sessions        Session[]
-  suggestions     BookSuggestion[]
-  votes           Vote[]
-  comments        Comment[]
-  ratings         Rating[]
-  rsvps           Rsvp[]
-  progressUpdates ReadingProgress[]
-  createdRounds   Round[]           @relation("RoundCreator")
-  createdMeetings Meeting[]         @relation("MeetingCreator")
-  userBooks       UserBook[]
+  accounts          Account[]
+  sessions          Session[]
+  suggestions       BookSuggestion[]
+  votes             Vote[]
+  comments          Comment[]
+  ratings           Rating[]
+  rsvps             Rsvp[]
+  progressUpdates   ReadingProgress[]
+  createdRounds     Round[]           @relation("RoundCreator")
+  createdMeetings   Meeting[]         @relation("MeetingCreator")
+  userBooks         UserBook[]
+  following         Follow[]          @relation("UserFollows")
+  followers         Follow[]          @relation("UserFollowedBy")
+  quotes            Quote[]
+  quoteLikes        QuoteLike[]
+  sentMessages      Message[]         @relation("MessageSender")
+  receivedMessages  Message[]         @relation("MessageReceiver")
+  createdActivities KahootActivity[]  @relation("KahootActivityCreator")
+  kahootScores      KahootScore[]
 }
 
 enum Role {
@@ -109,6 +118,7 @@ model Book {
   meetings        Meeting[]
   wonRound        Round?            @relation("RoundWinner")
   userBooks       UserBook[]
+  quotes          Quote[]
 
   @@index([isCurrent])
 }
@@ -176,16 +186,17 @@ model Vote {
 }
 
 model Comment {
-  id        String    @id @default(cuid())
-  bookId    String
-  userId    String
-  parentId  String?
-  content   String    @db.Text
-  isSpoiler Boolean   @default(false)
-  chapter   Int?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id           String    @id @default(cuid())
+  bookId       String
+  userId       String
+  parentId     String?
+  content      String    @db.Text
+  isSpoiler    Boolean   @default(false)
+  isReflection Boolean   @default(false)
+  chapter      Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   book    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
   user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -244,9 +255,10 @@ model Meeting {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  book    Book?  @relation(fields: [bookId], references: [id], onDelete: SetNull)
-  creator User?  @relation("MeetingCreator", fields: [creatorId], references: [id])
-  rsvps   Rsvp[]
+  book             Book?            @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  creator          User?            @relation("MeetingCreator", fields: [creatorId], references: [id])
+  rsvps            Rsvp[]
+  kahootActivities KahootActivity[]
 
   @@index([startsAt])
 }
@@ -302,4 +314,101 @@ enum ShelfStatus {
   READING
   WANT_TO_READ
   FINISHED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lote 3 — pendiente de aplicar a producción (ver docs/MIGRATIONS.md, sección 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  // La regla anti-auto-follow (followerId !== followingId) se valida en la
+  // server action: Prisma no soporta check constraints portables.
+  follower  User @relation("UserFollows", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowedBy", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+model Quote {
+  id        String   @id @default(cuid())
+  bookId    String
+  userId    String
+  content   String   @db.Text
+  page      Int?
+  chapter   Int?
+  createdAt DateTime @default(now())
+
+  book  Book        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes QuoteLike[]
+
+  @@index([bookId])
+  @@index([userId])
+}
+
+model QuoteLike {
+  id        String   @id @default(cuid())
+  quoteId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quoteId, userId])
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String    @db.Text
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  // El código de DMs (bandeja, envío, marcar leído) llega en la próxima
+  // tanda; el schema va ahora para agrupar el db push con el resto del lote.
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, readAt])
+}
+
+model KahootActivity {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  playedAt    DateTime
+  meetingId   String?
+  creatorId   String?
+  createdAt   DateTime @default(now())
+
+  meeting Meeting?      @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  creator User?         @relation("KahootActivityCreator", fields: [creatorId], references: [id])
+  scores  KahootScore[]
+
+  @@index([meetingId])
+  @@index([creatorId])
+}
+
+model KahootScore {
+  id             String   @id @default(cuid())
+  activityId     String
+  userId         String
+  points         Int
+  correctAnswers Int?
+  createdAt      DateTime @default(now())
+
+  activity KahootActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([userId])
 }

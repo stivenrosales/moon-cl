@@ -51,6 +51,7 @@ export const commentSchema = z.object({
   parentId: z.string().nullable().optional(),
   content: z.string().min(1).max(4000),
   isSpoiler: z.boolean().default(false),
+  isReflection: z.boolean().default(false),
   chapter: z.number().int().positive().max(2000).optional().nullable(),
 });
 
@@ -63,6 +64,7 @@ export const ratingSchema = z.object({
 export const progressSchema = z.object({
   bookId: z.string().min(1),
   currentPage: z.number().int().min(0).max(20000),
+  chapter: z.number().int().positive().max(2000).optional().nullable(),
   note: z.string().max(400).optional().nullable(),
 });
 
@@ -129,4 +131,39 @@ export const updateMyBookSchema = z.object({
   bookId: z.string().min(1),
   currentPage: z.number().int().positive().max(20000).optional().nullable(),
   currentChapter: z.number().int().positive().max(2000).optional().nullable(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Comunidad y frases (Paquete C)
+// ─────────────────────────────────────────────────────────────────────────
+
+export const quoteSchema = z.object({
+  bookId: z.string().min(1),
+  content: z.string().min(3).max(500),
+  page: z.number().int().positive().optional().nullable(),
+  chapter: z.number().int().positive().optional().nullable(),
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Kahoot (Paquete E)
+// ─────────────────────────────────────────────────────────────────────────
+
+export const kahootActivitySchema = z.object({
+  title: z.string().min(2).max(80),
+  description: z.string().max(2000).optional().nullable(),
+  playedAt: z.coerce.date(),
+  meetingId: z.string().optional().nullable(),
+});
+
+export const kahootScoresSchema = z.object({
+  activityId: z.string().min(1),
+  scores: z
+    .array(
+      z.object({
+        userId: z.string().min(1),
+        points: z.number().int().min(0),
+        correctAnswers: z.number().int().min(0).optional().nullable(),
+      }),
+    )
+    .min(1, "Agrega al menos un puntaje"),
 });

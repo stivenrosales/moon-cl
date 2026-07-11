@@ -15,10 +15,19 @@ interface ProgressFormProps {
   bookId: string;
   totalPages?: number | null;
   initialPage?: number;
+  initialChapter?: number | null;
 }
 
-export function ProgressForm({ bookId, totalPages, initialPage = 0 }: ProgressFormProps) {
+export function ProgressForm({
+  bookId,
+  totalPages,
+  initialPage = 0,
+  initialChapter,
+}: ProgressFormProps) {
   const [page, setPage] = React.useState(initialPage);
+  const [chapter, setChapter] = React.useState<string>(
+    initialChapter ? String(initialChapter) : "",
+  );
   const [note, setNote] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -28,7 +37,12 @@ export function ProgressForm({ bookId, totalPages, initialPage = 0 }: ProgressFo
     e.preventDefault();
     setSubmitting(true);
     try {
-      await updateProgress({ bookId, currentPage: page, note: note || undefined });
+      await updateProgress({
+        bookId,
+        currentPage: page,
+        chapter: chapter ? Number(chapter) : null,
+        note: note || undefined,
+      });
       toast.success(`Avance guardado · ${pct}%`);
       setNote("");
     } catch (err) {
@@ -40,7 +54,7 @@ export function ProgressForm({ bookId, totalPages, initialPage = 0 }: ProgressFo
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-[140px_140px_1fr] gap-4 items-end">
         <Field>
           <Label htmlFor="page" required>Página actual</Label>
           <Input
@@ -51,6 +65,19 @@ export function ProgressForm({ bookId, totalPages, initialPage = 0 }: ProgressFo
             max={totalPages ?? 20000}
             value={page}
             onChange={(e) => setPage(Math.max(0, Number(e.target.value || 0)))}
+          />
+        </Field>
+        <Field>
+          <Label htmlFor="chapter" optional>Capítulo actual</Label>
+          <Input
+            id="chapter"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={2000}
+            value={chapter}
+            onChange={(e) => setChapter(e.target.value)}
+            placeholder="Cap."
           />
         </Field>
         <div className="space-y-2">

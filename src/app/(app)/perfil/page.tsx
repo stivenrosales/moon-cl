@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/book-cover";
 import { StarRating } from "@/components/star-rating";
 import { ProfileEditDialog } from "@/components/profile-edit-dialog";
+import { ProfileStat } from "@/components/profile-stat";
+import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 
@@ -23,7 +25,7 @@ export default async function PerfilPage() {
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
-  const [user, suggestions, votes, ratings, comments] = await Promise.all([
+  const [user, suggestions, votes, ratings, comments, followCounts] = await Promise.all([
     db.user.findUnique({ where: { id: userId } }),
     db.bookSuggestion.findMany({
       where: { userId },
@@ -37,6 +39,7 @@ export default async function PerfilPage() {
       orderBy: { createdAt: "desc" },
     }),
     db.comment.count({ where: { userId, deletedAt: null } }),
+    getFollowCounts(userId),
   ]);
 
   if (!user) return null;
@@ -67,10 +70,16 @@ export default async function PerfilPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat label="Sugerencias" value={suggestions.length} />
-        <Stat label="Votos emitidos" value={votes} />
-        <Stat label="Comentarios" value={comments} />
-        <Stat label="Valoraciones" value={ratings.length} />
+        <ProfileStat label="Sugerencias" value={suggestions.length} />
+        <ProfileStat label="Votos emitidos" value={votes} />
+        <ProfileStat label="Comentarios" value={comments} />
+        <ProfileStat label="Valoraciones" value={ratings.length} />
+      </div>
+
+      {/* Comunidad: seguidores/siguiendo, enlazan al directorio de miembros */}
+      <div className="grid grid-cols-2 gap-4 max-w-sm">
+        <ProfileStat label="Seguidores" value={followCounts.followers} href="/miembros" />
+        <ProfileStat label="Siguiendo" value={followCounts.following} href="/miembros" />
       </div>
 
       {/* Botones */}
@@ -192,14 +201,5 @@ export default async function PerfilPage() {
         )}
       </section>
     </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="p-5">
-      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
-      <p className="display mt-2 text-3xl tabular-nums">{value}</p>
-    </Card>
   );
 }

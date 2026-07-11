@@ -14,6 +14,7 @@ export async function updateProgress(input: unknown) {
       bookId: data.bookId,
       userId: user.id,
       currentPage: data.currentPage,
+      chapter: data.chapter ?? null,
       note: data.note ?? null,
     },
   });

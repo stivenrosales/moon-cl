@@ -4,11 +4,14 @@ import {
   bookInputSchema,
   commentSchema,
   idSchema,
+  kahootActivitySchema,
+  kahootScoresSchema,
   meetingSchema,
   moveShelfSchema,
   onboardingSchema,
   profileUpdateSchema,
   progressSchema,
+  quoteSchema,
   ratingSchema,
   roundSchema,
   shelfStatusSchema,
@@ -723,5 +726,211 @@ describe("updateMyBookSchema", () => {
   it("rechaza cuando falta bookId", () => {
     const result = updateMyBookSchema.safeParse({ currentPage: 10 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("quoteSchema", () => {
+  it("acepta una frase válida mínima", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1", content: "Una frase" });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta una frase válida con página y capítulo", () => {
+    const result = quoteSchema.safeParse({
+      bookId: "book-1",
+      content: "Una frase memorable del libro.",
+      page: 120,
+      chapter: 5,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza contenido de menos de 3 caracteres", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1", content: "Ho" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza contenido de más de 500 caracteres", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1", content: "a".repeat(501) });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta bookId", () => {
+    const result = quoteSchema.safeParse({ content: "Una frase" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta content", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza page igual a 0 (no positivo)", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1", content: "Una frase", page: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza chapter negativo", () => {
+    const result = quoteSchema.safeParse({
+      bookId: "book-1",
+      content: "Una frase",
+      chapter: -1,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta page y chapter como null", () => {
+    const result = quoteSchema.safeParse({
+      bookId: "book-1",
+      content: "Una frase",
+      page: null,
+      chapter: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza page no entero", () => {
+    const result = quoteSchema.safeParse({ bookId: "book-1", content: "Una frase", page: 12.5 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("kahootActivitySchema", () => {
+  it("acepta una actividad válida con solo título y fecha", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "Trivia de Rayuela",
+      playedAt: "2026-07-01",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta una actividad válida con descripción y reunión", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "Trivia de Rayuela",
+      description: "10 preguntas sobre los primeros capítulos",
+      playedAt: "2026-07-01",
+      meetingId: "meeting-1",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("coacciona playedAt en formato string a Date", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "Trivia de Rayuela",
+      playedAt: "2026-07-01",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.playedAt).toBeInstanceOf(Date);
+    }
+  });
+
+  it("rechaza un título de menos de 2 caracteres", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "A",
+      playedAt: "2026-07-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un título de más de 80 caracteres", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "a".repeat(81),
+      playedAt: "2026-07-01",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta playedAt", () => {
+    const result = kahootActivitySchema.safeParse({ title: "Trivia de Rayuela" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta el título", () => {
+    const result = kahootActivitySchema.safeParse({ playedAt: "2026-07-01" });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta description y meetingId como null", () => {
+    const result = kahootActivitySchema.safeParse({
+      title: "Trivia de Rayuela",
+      playedAt: "2026-07-01",
+      description: null,
+      meetingId: null,
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("kahootScoresSchema", () => {
+  it("acepta puntajes válidos con un solo miembro", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: 100 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta puntajes válidos con correctAnswers", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: 100, correctAnswers: 8 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta points igual a 0", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: 0 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza points negativos", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: -10 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza points no enteros", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: 10.5 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un arreglo de scores vacío", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta activityId", () => {
+    const result = kahootScoresSchema.safeParse({
+      scores: [{ userId: "user-1", points: 10 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando un score no trae userId", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ points: 10 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta correctAnswers como null", () => {
+    const result = kahootScoresSchema.safeParse({
+      activityId: "activity-1",
+      scores: [{ userId: "user-1", points: 10, correctAnswers: null }],
+    });
+    expect(result.success).toBe(true);
   });
 });

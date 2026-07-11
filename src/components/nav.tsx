@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, User2, Shield, Home } from "lucide-react";
+import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, Users, MessagesSquare, Trophy, User2, Shield, Home } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { MoonLogo } from "@/components/moon-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -34,7 +34,10 @@ const links = [
   { href: "/rondas", label: "Votación", icon: Vote },
   { href: "/biblioteca", label: "Biblioteca", icon: Library },
   { href: "/mi-biblioteca", label: "Mi biblioteca", icon: BookMarked },
+  { href: "/comunidad", label: "Comunidad", icon: MessagesSquare },
+  { href: "/miembros", label: "Miembros", icon: Users },
   { href: "/reuniones", label: "Reuniones", icon: CalendarDays },
+  { href: "/puntajes", label: "Puntajes", icon: Trophy },
 ];
 
 export function Nav({ user }: NavProps) {
@@ -59,7 +62,7 @@ export function Nav({ user }: NavProps) {
           </div>
         </Link>
 
-        <nav className="ml-4 hidden md:flex items-center gap-1">
+        <nav className="ml-4 hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -67,7 +70,7 @@ export function Nav({ user }: NavProps) {
                 key={href}
                 href={href}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors focus-ring",
+                  "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors focus-ring",
                   active
                     ? "bg-primary/15 text-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60",

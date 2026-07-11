@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FollowButton } from "@/components/follow-button";
 import { getInitials } from "@/lib/utils";
@@ -18,6 +19,8 @@ export interface MemberRow {
   booksInCommon: number;
   readingTitle: string | null;
   isNew: boolean;
+  /** Afinidad >=70 con evidencia real (contrato: nunca con datos vacíos). */
+  veryAffine: boolean;
 }
 
 interface MemberListProps {
@@ -76,11 +79,18 @@ export function MemberList({ rows }: MemberListProps) {
                 </Avatar>
               </Link>
               <div className="min-w-0 flex-1">
-                <Link href={`/perfil/${m.id}`} className="focus-ring rounded-sm">
-                  <p className="truncate text-sm font-medium hover:text-primary transition-colors">
-                    {m.name ?? m.email?.split("@")[0]}
-                  </p>
-                </Link>
+                <div className="flex min-w-0 items-center gap-2">
+                  <Link href={`/perfil/${m.id}`} className="focus-ring min-w-0 rounded-sm">
+                    <p className="truncate text-sm font-medium hover:text-primary transition-colors">
+                      {m.name ?? m.email?.split("@")[0]}
+                    </p>
+                  </Link>
+                  {m.veryAffine ? (
+                    <Badge variant="gold" className="shrink-0">
+                      Muy afín
+                    </Badge>
+                  ) : null}
+                </div>
                 <p className="truncate text-xs text-muted-foreground">{contextLine(m)}</p>
               </div>
               <FollowButton userId={m.id} initialFollowing={m.isFollowing} className="shrink-0" />

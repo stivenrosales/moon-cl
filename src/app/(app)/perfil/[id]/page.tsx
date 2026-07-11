@@ -104,12 +104,12 @@ export default async function PerfilPublicoPage({
       {/* Botones */}
       <div className="flex flex-wrap gap-2">
         <FollowButton userId={user.id} initialFollowing={!!isFollowing} size="default" />
-        <span title="Próximamente">
-          <Button type="button" variant="outline" disabled className="gap-2">
+        <Button type="button" variant="outline" className="gap-2" asChild>
+          <Link href={`/mensajes/${user.id}`}>
             <MessageCircle className="h-4 w-4" />
             Mensaje
-          </Button>
-        </span>
+          </Link>
+        </Button>
       </div>
 
       {/* Géneros favoritos */}

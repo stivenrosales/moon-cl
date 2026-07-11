@@ -16,6 +16,7 @@ import { RoleSelect } from "@/components/admin/role-select";
 import { BookStateButtons } from "@/components/admin/book-state-buttons";
 import { NewKahootActivityForm } from "@/components/admin/kahoot-activity-form";
 import { KahootActivityActions } from "@/components/admin/kahoot-activity-actions";
+import { ReportsPanel } from "@/components/admin/reports-panel";
 import { formatDate, getInitials } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 
@@ -32,7 +33,7 @@ export default async function AdminPage() {
   // a ambos; las de ADMIN (rondas, reuniones, libros, roles) siguen atadas
   // a isAdmin porque sus server actions exigen requireAdmin.
 
-  const [rounds, books, users, meetings, kahootActivities] = await Promise.all([
+  const [rounds, books, users, meetings, kahootActivities, reports] = await Promise.all([
     db.round.findMany({
       orderBy: [{ status: "asc" }, { startsAt: "desc" }],
       include: { _count: { select: { suggestions: true } } },
@@ -55,6 +56,14 @@ export default async function AdminPage() {
         scores: { select: { userId: true, points: true, correctAnswers: true } },
       },
     }),
+    db.report.findMany({
+      where: { status: "OPEN" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        reporter: { select: { id: true, name: true, email: true, image: true } },
+        reportedUser: { select: { id: true, name: true, email: true, image: true } },
+      },
+    }),
   ]);
 
   const bookOptions = books.map((b) => ({ id: b.id, title: b.title }));
@@ -74,6 +83,16 @@ export default async function AdminPage() {
           Panel <span className="hand-script italic text-primary">admin</span>
         </h1>
       </header>
+
+      {/* Reportes — visible para MODERATOR y ADMIN (igual que Kahoot): es
+          el único lugar del sistema donde se ve quién reportó y el hilo de
+          DMs ajenos detrás de un reporte. */}
+      <section id="reportes" className="space-y-4">
+        <h2 className="display text-2xl">Reportes</h2>
+        <Card className="p-6">
+          <ReportsPanel reports={reports} />
+        </Card>
+      </section>
 
       {/* Rondas */}
       {isAdmin ? (

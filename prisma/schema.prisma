@@ -46,6 +46,13 @@ model User {
   receivedMessages  Message[]         @relation("MessageReceiver")
   createdActivities KahootActivity[]  @relation("KahootActivityCreator")
   kahootScores      KahootScore[]
+  blocking          Block[]           @relation("UserBlocks")
+  blockedBy         Block[]           @relation("UserBlockedBy")
+  reportsMade       Report[]          @relation("ReportReporter")
+  reportsReceived   Report[]          @relation("ReportReported")
+  reportsResolved   Report[]          @relation("ReportResolver")
+  matchesAsUserA    Match[]           @relation("MatchUserA")
+  matchesAsUserB    Match[]           @relation("MatchUserB")
 }
 
 enum Role {
@@ -411,4 +418,67 @@ model KahootScore {
 
   @@unique([activityId, userId])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lote 4 — pendiente de aplicar a producción (ver docs/MIGRATIONS.md, sección 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  reporterId     String
+  reportedUserId String
+  category       String
+  subReason      String?
+  details        String?      @db.Text
+  // Referencia débil: sin FK dura hacia Message para no impedir el borrado
+  // de mensajes reportados. La UI resuelve el contenido del mensaje al
+  // momento de mostrar el reporte; si el mensaje ya no existe, se muestra
+  // el reporte igual (sin el contenido).
+  messageId      String?
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  resolvedAt     DateTime?
+  resolvedById   String?
+
+  reporter     User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User  @relation("ReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  resolvedBy   User? @relation("ReportResolver", fields: [resolvedById], references: [id])
+
+  @@index([status])
+  @@index([reportedUserId])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  weekOf    DateTime @db.Date
+  score     Int
+  createdAt DateTime @default(now())
+
+  userA User @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId, weekOf])
+  @@index([weekOf])
 }

@@ -149,3 +149,25 @@ DATABASE_URL="<url de produccion>" npx prisma db push
 ```
 
 Verificar después con `npx prisma validate` y una consulta puntual (o `prisma studio`) de que `Follow`, `Quote`, `QuoteLike`, `Message`, `KahootActivity`, `KahootScore` y las columnas nuevas existen en producción, antes de deployar el código que dependa de ellas (según el orden de la sección 3).
+
+## 8. Lote 4 — pendiente
+
+Este lote agrupa los **últimos modelos del roadmap de schema**: bloqueo de usuarios, reportes de moderación y Book Match semanal. Escritos en una sola pasada en `prisma/schema.prisma` y verificados localmente con `npx prisma format` + `npx prisma generate` + `npx prisma validate` (con `DATABASE_URL` dummy) — los tests con mocks siguen en verde. **Ninguno de estos cambios está aplicado todavía en la base de datos real.** El código que los consume (fuera de este cambio, que es solo schema) compilará y sus tests con mocks pasarán, pero cualquier ruta que lea/escriba estos campos romperá en runtime contra producción hasta que un humano corra `db push` contra la base real.
+
+Todo es aditivo — tres modelos nuevos, sin tocar columnas ni tablas existentes (solo se agregan las relaciones inversas en `User`) — así que **puede aplicarse en un único `db push` junto con los Lotes 2 y 3** (secciones 6 y 7), sin downtime, siguiendo igualmente el procedimiento de la sección 3.
+
+Modelos agregados:
+
+1. `model Block` — bloqueo de usuarios (`blockerId`, `blockedId`, `createdAt`), relaciones explícitas `UserBlocks`/`UserBlockedBy` hacia `User` con `onDelete: Cascade`, `@@unique([blockerId, blockedId])`, `@@index([blockedId])`.
+2. `enum ReportStatus { OPEN, RESOLVED, DISMISSED }` + `model Report` — reportes de moderación (`reporterId`, `reportedUserId`, `category`, `subReason?`, `details?` `@db.Text`, `messageId?`, `status` `@default(OPEN)`, `createdAt`, `resolvedAt?`, `resolvedById?`), relaciones explícitas `ReportReporter`/`ReportReported` hacia `User` con `onDelete: Cascade` y `ReportResolver` (opcional, sin cascade — mismo patrón que `Round.creatorId`/`Meeting.creatorId`), `@@index([status])`, `@@index([reportedUserId])`. `messageId` es una referencia débil **sin FK dura** hacia `Message`, a propósito: un reporte no debe bloquear el borrado de un mensaje reportado ni el de una cuenta con mensajes reportados pendientes de revisión.
+3. `model Match` — Book Match semanal (`userAId`, `userBId`, `weekOf` `@db.Date`, `score`, `createdAt`), relaciones explícitas `MatchUserA`/`MatchUserB` hacia `User` con `onDelete: Cascade`, `@@unique([userAId, userBId, weekOf])`, `@@index([weekOf])`.
+
+Además se agregó `swr` a `package.json` (sin relación con el schema) para el data-fetching client-side que va a consumir estos modelos en el código de la próxima tanda (mensajería, moderación, Book Match).
+
+Aplicación (junto con los Lotes 2 y 3, un solo `db push`):
+
+```bash
+DATABASE_URL="<url de produccion>" npx prisma db push
+```
+
+Verificar después con `npx prisma validate` y una consulta puntual (o `prisma studio`) de que `Block`, `Report`, `Match` y sus índices/constraints existen en producción, antes de deployar el código que dependa de ellas (según el orden de la sección 3).

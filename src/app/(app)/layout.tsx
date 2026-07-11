@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { db } from "@/lib/db";
 import { Nav } from "@/components/nav";
 import { SessionProvider } from "@/components/session-provider";
 
@@ -23,10 +24,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     role: session.user.role,
   };
 
+  const unreadCount = await db.message.count({
+    where: { receiverId: user.id, readAt: null },
+  });
+
   return (
     <SessionProvider>
       <div className="min-h-dvh flex flex-col">
-        <Nav user={user} />
+        <Nav user={user} unreadCount={unreadCount} />
         <main className="container flex-1 py-5 md:py-8">{children}</main>
         <footer className="border-t border-border/60 py-4">
           <div className="container text-center text-[10px] uppercase tracking-[0.32em] text-muted-foreground">

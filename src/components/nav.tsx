@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, Users, MessagesSquare, Trophy, User2, Shield, Home } from "lucide-react";
+import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, Users, MessagesSquare, Trophy, User2, Shield, Home, Mail } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { MoonLogo } from "@/components/moon-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -27,6 +27,7 @@ interface NavProps {
     image?: string | null;
     role: Role;
   };
+  unreadCount?: number;
 }
 
 const links = [
@@ -40,7 +41,7 @@ const links = [
   { href: "/puntajes", label: "Puntajes", icon: Trophy },
 ];
 
-export function Nav({ user }: NavProps) {
+export function Nav({ user, unreadCount = 0 }: NavProps) {
   const pathname = usePathname();
   const isAdmin = user.role === "ADMIN" || user.role === "MODERATOR";
   const inAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
@@ -84,6 +85,24 @@ export function Nav({ user }: NavProps) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/mensajes"
+            aria-label={unreadCount > 0 ? `Mensajes, ${unreadCount} sin leer` : "Mensajes"}
+            className={cn(
+              "relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-ring",
+              pathname === "/mensajes" || pathname.startsWith("/mensajes/")
+                ? "bg-primary/15 text-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            )}
+          >
+            <Mail className="h-5 w-5" />
+            {unreadCount > 0 ? (
+              <span
+                aria-hidden
+                className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-background"
+              />
+            ) : null}
+          </Link>
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger className="rounded-full focus-ring" aria-label="Menú de usuario">

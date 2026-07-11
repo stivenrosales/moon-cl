@@ -93,6 +93,7 @@ export default async function PerfilPage() {
             bio: user.bio,
             birthday: user.birthday,
             favoriteGenres: user.favoriteGenres,
+            isMatchOptIn: user.isMatchOptIn,
           }}
         />
       </div>

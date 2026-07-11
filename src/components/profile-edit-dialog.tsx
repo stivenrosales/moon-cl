@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GENEROS } from "@/lib/genres";
 import { cn, getInitials } from "@/lib/utils";
 import { setAvatar, updateProfile } from "@/server/actions/profile";
+import { toggleMatchOptIn } from "@/server/actions/match";
 
 const MAX_GENRES = 10;
 const MONTHS = Array.from({ length: 12 }, (_, i) =>
@@ -41,6 +42,7 @@ interface ProfileEditDialogProps {
     bio: string | null;
     birthday: Date | null;
     favoriteGenres: string[];
+    isMatchOptIn: boolean;
   };
 }
 
@@ -57,6 +59,8 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
     user.birthday ? String(new Date(user.birthday).getUTCMonth()) : "",
   );
   const [genres, setGenres] = React.useState<string[]>(user.favoriteGenres);
+  const [matchOptIn, setMatchOptIn] = React.useState(user.isMatchOptIn);
+  const [matchToggling, setMatchToggling] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -90,6 +94,21 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
       toast.error(msg);
     } finally {
       setUploadingAvatar(false);
+    }
+  }
+
+  async function handleToggleMatch() {
+    setMatchToggling(true);
+    const optimistic = !matchOptIn;
+    setMatchOptIn(optimistic);
+    try {
+      const result = await toggleMatchOptIn();
+      setMatchOptIn(result.isMatchOptIn);
+    } catch (err) {
+      setMatchOptIn(!optimistic);
+      toast.error(err instanceof Error ? err.message : "No se pudo actualizar tu Book Match");
+    } finally {
+      setMatchToggling(false);
     }
   }
 
@@ -247,6 +266,37 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
                   </button>
                 );
               })}
+            </div>
+          </Field>
+
+          <Field>
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 px-3.5 py-3">
+              <div className="space-y-0.5">
+                <Label>Book Match semanal</Label>
+                <FieldDescription>
+                  Cada lunes te presentamos a alguien del club con quien compartes gustos de lectura, con un
+                  correo para romper el hielo. Es opcional — puedes desactivarlo cuando quieras.
+                </FieldDescription>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={matchOptIn}
+                aria-label="Book Match semanal"
+                disabled={matchToggling}
+                onClick={handleToggleMatch}
+                className={cn(
+                  "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors focus-ring disabled:opacity-50",
+                  matchOptIn ? "border-primary bg-primary" : "border-border bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
+                    matchOptIn ? "translate-x-[18px]" : "translate-x-0.5",
+                  )}
+                />
+              </button>
             </div>
           </Field>
         </div>

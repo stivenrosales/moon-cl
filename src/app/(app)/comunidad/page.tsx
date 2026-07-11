@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { loadFeed } from "@/server/services/feed";
+import { computeAffinity, labelForScore, loadAffinityData } from "@/server/services/affinity";
+import { currentMatchWeekOf } from "@/server/jobs/book-match";
+import { MatchCard, type MatchCardMatch } from "@/components/match-card";
 import { ActivityFeed } from "./activity-feed";
 import { QuotesPanel } from "./quotes-panel";
 
@@ -25,7 +28,7 @@ export default async function ComunidadPage({
   const { tab } = await searchParams;
   const activeTab = tab === "frases" || tab === "miembros" ? tab : "actividad";
 
-  const [feed, quotes, shelfBooks, clubBook] = await Promise.all([
+  const [feed, quotes, shelfBooks, clubBook, viewerMatchSettings, weeklyMatch] = await Promise.all([
     loadFeed(userId),
     db.quote.findMany({
       orderBy: { createdAt: "desc" },
@@ -46,6 +49,10 @@ export default async function ComunidadPage({
       where: { isCurrent: true },
       select: { id: true, title: true, coverUrl: true },
     }),
+    db.user.findUnique({ where: { id: userId }, select: { isMatchOptIn: true } }),
+    db.match.findFirst({
+      where: { weekOf: currentMatchWeekOf(new Date()), OR: [{ userAId: userId }, { userBId: userId }] },
+    }),
   ]);
 
   const quoteCards = quotes.map((q) => ({
@@ -64,6 +71,39 @@ export default async function ComunidadPage({
     ...(clubBook ? [clubBook] : []),
     ...shelfBooks.map((ub) => ub.book),
   ]);
+
+  // Afinidad recalculada al vuelo (nunca se cachea el detalle): el score
+  // guardado en Match es fijo desde el emparejamiento, pero la evidencia
+  // (libros/géneros en común) se recompone en base a los datos actuales —
+  // si evapora del todo, la card cae al estado "sin match" en vez de
+  // mostrar un porcentaje sin nada real detrás (contrato: la afinidad
+  // jamás se muestra con datos vacíos).
+  let weeklyMatchCard: MatchCardMatch | null = null;
+  if (weeklyMatch) {
+    const otherId = weeklyMatch.userAId === userId ? weeklyMatch.userBId : weeklyMatch.userAId;
+    const [otherUser, affinityData] = await Promise.all([
+      db.user.findUnique({
+        where: { id: otherId },
+        select: { id: true, name: true, email: true, image: true },
+      }),
+      loadAffinityData([userId, otherId]),
+    ]);
+    const viewerData = affinityData.get(userId);
+    const otherData = affinityData.get(otherId);
+    const affinity = viewerData && otherData ? computeAffinity(viewerData, otherData) : null;
+
+    if (otherUser && affinity) {
+      weeklyMatchCard = {
+        otherUserId: otherUser.id,
+        otherUserName: otherUser.name,
+        otherUserEmail: otherUser.email,
+        otherUserImage: otherUser.image,
+        score: weeklyMatch.score,
+        label: labelForScore(weeklyMatch.score),
+        evidence: affinity.evidence,
+      };
+    }
+  }
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -92,7 +132,8 @@ export default async function ComunidadPage({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="actividad">
+        <TabsContent value="actividad" className="space-y-4">
+          <MatchCard isOptedIn={viewerMatchSettings?.isMatchOptIn ?? false} match={weeklyMatchCard} />
           <ActivityFeed entries={feed} />
         </TabsContent>
 

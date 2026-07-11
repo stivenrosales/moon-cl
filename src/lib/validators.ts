@@ -167,3 +167,31 @@ export const kahootScoresSchema = z.object({
     )
     .min(1, "Agrega al menos un puntaje"),
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mensajes privados y moderación (Paquete B1)
+// ─────────────────────────────────────────────────────────────────────────
+
+export const messageSchema = z.object({
+  receiverId: z.string().cuid(),
+  content: z
+    .string()
+    .trim()
+    .min(1, "El mensaje no puede estar vacío")
+    .max(2000, "El mensaje es demasiado largo (máx. 2000 caracteres)"),
+});
+
+export const reportCategorySchema = z.enum([
+  "ACOSO",
+  "SPAM",
+  "CONTENIDO_INAPROPIADO",
+  "OTRO",
+]);
+
+export const reportSchema = z.object({
+  reportedUserId: z.string().cuid(),
+  category: reportCategorySchema,
+  subReason: z.string().max(120).optional().nullable(),
+  details: z.string().max(1000).optional().nullable(),
+  messageId: z.string().cuid().optional().nullable(),
+});

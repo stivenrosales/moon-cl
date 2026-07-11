@@ -34,6 +34,11 @@ export function formatDateTime(date: Date | string) {
   }).format(d);
 }
 
+export function formatTime(date: Date | string) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
+}
+
 export function relativeTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = Date.now();

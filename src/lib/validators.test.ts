@@ -7,12 +7,14 @@ import {
   kahootActivitySchema,
   kahootScoresSchema,
   meetingSchema,
+  messageSchema,
   moveShelfSchema,
   onboardingSchema,
   profileUpdateSchema,
   progressSchema,
   quoteSchema,
   ratingSchema,
+  reportSchema,
   roundSchema,
   shelfStatusSchema,
   updateMyBookSchema,
@@ -932,5 +934,108 @@ describe("kahootScoresSchema", () => {
       scores: [{ userId: "user-1", points: 10, correctAnswers: null }],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("messageSchema", () => {
+  const RECEIVER_ID = "cme1111111111111111111111";
+
+  it("acepta un mensaje válido", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID, content: "Hola, ¿cómo vas con el libro?" });
+    expect(result.success).toBe(true);
+  });
+
+  it("recorta espacios en blanco del contenido (trim)", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID, content: "  hola  " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.content).toBe("hola");
+    }
+  });
+
+  it("rechaza un contenido vacío tras el trim", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID, content: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un contenido de más de 2000 caracteres", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID, content: "a".repeat(2001) });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta exactamente 2000 caracteres", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID, content: "a".repeat(2000) });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza un receiverId que no es un cuid válido", () => {
+    const result = messageSchema.safeParse({ receiverId: "no-es-un-cuid", content: "hola" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta el contenido", () => {
+    const result = messageSchema.safeParse({ receiverId: RECEIVER_ID });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("reportSchema", () => {
+  const REPORTED_ID = "cme2222222222222222222222";
+  const MESSAGE_ID = "cme3333333333333333333333";
+
+  it("acepta un reporte válido con solo los campos requeridos", () => {
+    const result = reportSchema.safeParse({ reportedUserId: REPORTED_ID, category: "SPAM" });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta un reporte con todos los campos", () => {
+    const result = reportSchema.safeParse({
+      reportedUserId: REPORTED_ID,
+      category: "ACOSO",
+      subReason: "Mensajes reiterados no deseados",
+      details: "Detalle largo del contexto del reporte.",
+      messageId: MESSAGE_ID,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta las cuatro categorías válidas", () => {
+    for (const category of ["ACOSO", "SPAM", "CONTENIDO_INAPROPIADO", "OTRO"]) {
+      const result = reportSchema.safeParse({ reportedUserId: REPORTED_ID, category });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("rechaza una categoría fuera del enum", () => {
+    const result = reportSchema.safeParse({ reportedUserId: REPORTED_ID, category: "INSULTOS" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un reportedUserId que no es un cuid válido", () => {
+    const result = reportSchema.safeParse({ reportedUserId: "no-es-un-cuid", category: "SPAM" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza subReason de más de 120 caracteres", () => {
+    const result = reportSchema.safeParse({
+      reportedUserId: REPORTED_ID,
+      category: "OTRO",
+      subReason: "a".repeat(121),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza details de más de 1000 caracteres", () => {
+    const result = reportSchema.safeParse({
+      reportedUserId: REPORTED_ID,
+      category: "OTRO",
+      details: "a".repeat(1001),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta category", () => {
+    const result = reportSchema.safeParse({ reportedUserId: REPORTED_ID });
+    expect(result.success).toBe(false);
   });
 });

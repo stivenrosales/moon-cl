@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { closeExpiredRounds } from "@/server/jobs/close-expired-rounds";
 import { sendMeetingReminders } from "@/server/jobs/meeting-reminders";
 import { sendBirthdayGreetings } from "@/server/jobs/birthdays";
+import { runBookMatch } from "@/server/jobs/book-match";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,10 @@ const jobs: JobDefinition[] = [
   { name: "closeExpiredRounds", run: closeExpiredRounds },
   { name: "sendMeetingReminders", run: sendMeetingReminders },
   { name: "sendBirthdayGreetings", run: sendBirthdayGreetings },
+  // Book Match semanal: se auto-descarta salvo que "hoy" sea lunes en
+  // America/Lima (ver isMondayInLima en jobs/book-match.ts) — cero crons
+  // nuevos, Vercel Hobby permite máx. 2 y ambos ya están ocupados.
+  { name: "runBookMatch", run: runBookMatch },
 ];
 
 type JobResult =

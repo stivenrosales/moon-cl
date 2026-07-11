@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { booksInCommon } from "@/server/services/social";
+import { computeAffinity, loadAffinityData } from "@/server/services/affinity";
 import { MemberList, type MemberRow } from "@/components/member-list";
 
 export const metadata = { title: "Miembros" };
@@ -12,19 +13,24 @@ export default async function MiembrosPage() {
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
-  const [users, myFollowing, readingRows] = await Promise.all([
-    db.user.findMany({
-      where: { id: { not: userId } },
-      orderBy: { name: "asc" },
-    }),
+  const users = await db.user.findMany({
+    where: { id: { not: userId } },
+    orderBy: { name: "asc" },
+  });
+
+  const [myFollowing, readingRows, affinityData] = await Promise.all([
     db.follow.findMany({ where: { followerId: userId }, select: { followingId: true } }),
     db.userBook.findMany({
       where: { status: "READING" },
       orderBy: { updatedAt: "desc" },
       include: { book: { select: { title: true } } },
     }),
+    // Bulk: una sola pasada de afinidad para todo el directorio, en vez de
+    // N cálculos por fila — solo alimenta la insignia "Muy afín" de abajo.
+    loadAffinityData([userId, ...users.map((u) => u.id)]),
   ]);
 
+  const viewerAffinityData = affinityData.get(userId);
   const followingSet = new Set(myFollowing.map((f) => f.followingId));
 
   const readingByUser = new Map<string, string>();
@@ -35,16 +41,29 @@ export default async function MiembrosPage() {
   const weekAgo = new Date(Date.now() - WEEK_MS);
 
   const rows: MemberRow[] = await Promise.all(
-    users.map(async (u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      image: u.image,
-      isFollowing: followingSet.has(u.id),
-      booksInCommon: await booksInCommon(userId, u.id),
-      readingTitle: readingByUser.get(u.id) ?? null,
-      isNew: u.createdAt >= weekAgo,
-    })),
+    users.map(async (u) => {
+      const memberAffinityData = affinityData.get(u.id);
+      const affinity =
+        viewerAffinityData && memberAffinityData ? computeAffinity(viewerAffinityData, memberAffinityData) : null;
+      // Contrato visual: la insignia "Muy afín" solo aparece con score alto
+      // Y evidencia real detrás — nunca con datos vacíos.
+      const veryAffine =
+        !!affinity &&
+        affinity.score >= 70 &&
+        (affinity.evidence.librosEnComun > 0 || affinity.evidence.generosEnComun.length > 0);
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        isFollowing: followingSet.has(u.id),
+        booksInCommon: await booksInCommon(userId, u.id),
+        readingTitle: readingByUser.get(u.id) ?? null,
+        isNew: u.createdAt >= weekAgo,
+        veryAffine,
+      };
+    }),
   );
 
   return (

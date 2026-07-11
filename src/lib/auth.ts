@@ -79,8 +79,31 @@ const emailProvider = useResend
       },
     });
 
+// El adapter de Prisma lanza P2025 si el navegador trae una cookie de sesión
+// huérfana (sesión que ya no existe en la BD, p. ej. tras limpiar datos o en
+// local). Borrar algo que no existe no es un error: lo tratamos como no-op.
+const baseAdapter = PrismaAdapter(db);
+const adapter = {
+  ...baseAdapter,
+  async deleteSession(sessionToken: string): Promise<void> {
+    try {
+      await baseAdapter.deleteSession!(sessionToken);
+    } catch (err) {
+      if (
+        err &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code?: string }).code === "P2025"
+      ) {
+        return;
+      }
+      throw err;
+    }
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(db),
+  adapter,
   session: { strategy: "database" },
   pages: {
     signIn: "/login",

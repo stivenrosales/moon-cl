@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select } from "@/components/ui/select";
 import { DateTimeInput } from "@/components/ui/datetime-input";
 import { createMeeting } from "@/server/actions/meetings";
+import { MEETING_TYPE_OPTIONS } from "@/lib/meeting-types";
 
 interface BookOption {
   id: string;
@@ -38,6 +39,7 @@ export function NewMeetingForm({ books }: { books: BookOption[] }) {
         title: String(data.get("title")),
         description: String(data.get("description") || ""),
         bookId: (data.get("bookId") as string) || null,
+        type: (data.get("type") as string) || "REUNION",
         startsAt: new Date(startsAt),
         endsAt: endsAt ? new Date(endsAt) : null,
         location: (data.get("location") as string) || null,
@@ -60,6 +62,17 @@ export function NewMeetingForm({ books }: { books: BookOption[] }) {
       <Field>
         <Label htmlFor="m-title" required>Título</Label>
         <Input id="m-title" name="title" required placeholder="Encuentro mensual" />
+      </Field>
+
+      <Field>
+        <Label htmlFor="m-type" required>Tipo</Label>
+        <Select id="m-type" name="type" defaultValue="REUNION">
+          {MEETING_TYPE_OPTIONS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

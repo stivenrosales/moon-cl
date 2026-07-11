@@ -1,20 +1,23 @@
 import Link from "next/link";
-import { CalendarDays, Globe, MapPin } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { CalendarDays, CalendarRange, Globe, List as ListIcon, MapPin } from "lucide-react";
+import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MeetingsCalendar, type CalendarMeeting } from "@/components/meetings-calendar";
+import { MEETING_TYPE_BADGE_VARIANT, MEETING_TYPE_LABELS } from "@/lib/meeting-types";
 import { formatDateTime, relativeTime } from "@/lib/utils";
 
 export const metadata = { title: "Reuniones" };
 
 export default async function ReunionesPage() {
-  const session = await auth();
+  const session = await getSession();
   const isAdmin = session?.user?.role === "ADMIN";
+  const userId = session?.user?.id ?? null;
 
   const now = new Date();
-  const [upcoming, past] = await Promise.all([
+  const [upcoming, past, all] = await Promise.all([
     db.meeting.findMany({
       where: { startsAt: { gte: now } },
       orderBy: { startsAt: "asc" },
@@ -26,47 +29,84 @@ export default async function ReunionesPage() {
       take: 12,
       include: { book: true, _count: { select: { rsvps: true } } },
     }),
+    db.meeting.findMany({
+      orderBy: { startsAt: "asc" },
+      take: 500,
+      // userId ?? "" nunca matchea un cuid real: si no hay sesión, rsvps
+      // siempre viene vacío pero el shape del tipo se mantiene consistente.
+      include: { rsvps: { where: { userId: userId ?? "" }, select: { status: true } } },
+    }),
   ]);
 
+  const calendarMeetings: CalendarMeeting[] = all.map((m) => ({
+    id: m.id,
+    title: m.title,
+    type: m.type,
+    startsAt: m.startsAt,
+    myRsvp: m.rsvps[0]?.status ?? null,
+  }));
+
   return (
-    <div className="space-y-8 md:space-y-10">
+    <div className="space-y-6 md:space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="text-xs uppercase tracking-[0.32em] text-accent">El club se reúne</span>
-          <h1 className="h1-display display mt-2">
+          <span className="text-xs uppercase tracking-[0.32em] text-accent-text">El club se reúne</span>
+          <h1 className="display text-3xl md:text-4xl leading-[1.05] tracking-tight mt-1.5">
             Reuniones <span className="hand-script italic text-primary">del club</span>
           </h1>
         </div>
         {isAdmin ? (
-          <Button asChild variant="gold">
-            <Link href="/admin#reuniones">Programar reunión</Link>
-          </Button>
+          <Link
+            href="/admin#reuniones"
+            className="text-xs uppercase tracking-[0.22em] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Gestionar →
+          </Link>
         ) : null}
       </header>
 
-      {upcoming.length > 0 ? (
-        <Section title="Próximas">
-          {upcoming.map((m) => (
-            <MeetingCard key={m.id} meeting={m} />
-          ))}
-        </Section>
-      ) : (
-        <Card className="p-10 text-center">
-          <CalendarDays className="mx-auto h-8 w-8 text-primary/60" />
-          <p className="mt-4 hand-script text-2xl">Sin reuniones programadas</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Aparecerán aquí cuando el admin las cree.
-          </p>
-        </Card>
-      )}
+      <Tabs defaultValue="lista">
+        <TabsList>
+          <TabsTrigger value="lista">
+            <ListIcon className="mr-1.5 h-3.5 w-3.5" />
+            Lista
+          </TabsTrigger>
+          <TabsTrigger value="mes">
+            <CalendarRange className="mr-1.5 h-3.5 w-3.5" />
+            Mes
+          </TabsTrigger>
+        </TabsList>
 
-      {past.length > 0 ? (
-        <Section title="Pasadas">
-          {past.map((m) => (
-            <MeetingCard key={m.id} meeting={m} past />
-          ))}
-        </Section>
-      ) : null}
+        <TabsContent value="lista" className="space-y-6 md:space-y-8">
+          {upcoming.length > 0 ? (
+            <Section title="Próximas">
+              {upcoming.map((m) => (
+                <MeetingCard key={m.id} meeting={m} />
+              ))}
+            </Section>
+          ) : (
+            <Card className="p-8 text-center">
+              <CalendarDays className="mx-auto h-7 w-7 text-primary/60" />
+              <p className="mt-3 hand-script text-2xl">Sin reuniones programadas</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Aparecerán aquí cuando el admin las cree.
+              </p>
+            </Card>
+          )}
+
+          {past.length > 0 ? (
+            <Section title="Pasadas">
+              {past.map((m) => (
+                <MeetingCard key={m.id} meeting={m} past />
+              ))}
+            </Section>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="mes">
+          <MeetingsCalendar meetings={calendarMeetings} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -92,19 +132,22 @@ function MeetingCard({
 }) {
   return (
     <Link href={`/reuniones/${meeting.id}`} className="block focus-ring rounded-2xl">
-      <Card className="p-6 transition-all hover:-translate-y-0.5 hover:shadow-[0_30px_60px_-30px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+      <Card className="p-5 transition-all hover:-translate-y-0.5 hover:shadow-[0_30px_60px_-30px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-muted-foreground flex-wrap">
           {past ? <Badge variant="secondary">Pasada</Badge> : <Badge variant="success">Próxima</Badge>}
+          <Badge variant={MEETING_TYPE_BADGE_VARIANT[meeting.type]}>
+            {MEETING_TYPE_LABELS[meeting.type]}
+          </Badge>
           <span className="tabular-nums">{formatDateTime(meeting.startsAt)}</span>
           <span>· {relativeTime(meeting.startsAt)}</span>
         </div>
-        <h3 className="display mt-3 text-2xl leading-tight">{meeting.title}</h3>
+        <h3 className="display mt-2.5 text-xl md:text-2xl leading-tight">{meeting.title}</h3>
         {meeting.book ? (
           <p className="mt-1 text-sm text-muted-foreground italic">
             sobre <em>{meeting.book.title}</em>
           </p>
         ) : null}
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <div className="mt-2.5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           {meeting.isVirtual && meeting.meetingUrl ? (
             <span className="inline-flex items-center gap-1.5">
               <Globe className="h-3.5 w-3.5" /> Virtual

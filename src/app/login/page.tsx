@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { auth, signIn } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { MoonLogo } from "@/components/moon-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await auth();
+  const session = await getSession();
   if (session?.user) redirect("/dashboard");
 
   const { error } = await searchParams;

@@ -50,7 +50,7 @@ export function StarRating({
               height={size}
               className={cn(
                 "transition-colors",
-                active ? "fill-accent text-accent" : "text-muted-foreground/40",
+                active ? "fill-accent-text text-accent-text" : "text-muted-foreground/40",
               )}
             />
           </button>

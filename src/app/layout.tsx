@@ -30,12 +30,11 @@ export const metadata: Metadata = {
     template: "%s · Moon Club de Lectura",
   },
   description:
-    "Sugiere libros, vota lo que leeremos juntos y comparte la lectura bajo la luna. Un club de lectura íntimo, premium y abierto.",
+    "Lecturas simples, conversaciones profundas. Sugiere libros, vota lo que leeremos juntos y comparte la lectura bajo la luna en un club de lectura íntimo, premium y abierto.",
   keywords: ["club de lectura", "moon", "libros", "lectura", "votación", "comunidad"],
   openGraph: {
     title: "Moon · Club de Lectura",
-    description:
-      "Sugiere libros, vota lo que leeremos juntos y comparte la lectura bajo la luna.",
+    description: "Lecturas simples, conversaciones profundas.",
     type: "website",
     locale: "es_ES",
   },
@@ -44,8 +43,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F5EFE2" },
-    { media: "(prefers-color-scheme: dark)", color: "#11091F" },
+    { media: "(prefers-color-scheme: light)", color: "#FAF8FD" },
+    { media: "(prefers-color-scheme: dark)", color: "#140E1E" },
   ],
 };
 

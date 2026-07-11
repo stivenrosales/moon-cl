@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/book-cover";
 import { StarRating } from "@/components/star-rating";
+import { ProfileEditDialog } from "@/components/profile-edit-dialog";
 import { formatDate, getInitials } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 
@@ -18,7 +19,7 @@ const roleLabel: Record<Role, string> = {
 export const metadata = { title: "Mi perfil" };
 
 export default async function PerfilPage() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
@@ -50,7 +51,7 @@ export default async function PerfilPage() {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-2">
-          <span className="text-xs uppercase tracking-[0.32em] text-accent">Tu perfil</span>
+          <span className="text-xs uppercase tracking-[0.32em] text-accent-text">Tu perfil</span>
           <h1 className="h1-display display">
             {user.name ?? user.email?.split("@")[0]}
           </h1>
@@ -71,6 +72,49 @@ export default async function PerfilPage() {
         <Stat label="Comentarios" value={comments} />
         <Stat label="Valoraciones" value={ratings.length} />
       </div>
+
+      {/* Botones */}
+      <div className="flex flex-wrap gap-2">
+        <ProfileEditDialog
+          user={{
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            bio: user.bio,
+            birthday: user.birthday,
+            favoriteGenres: user.favoriteGenres,
+          }}
+        />
+      </div>
+
+      {/* Géneros favoritos */}
+      {user.favoriteGenres.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
+            Géneros favoritos
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {user.favoriteGenres.map((genre) => (
+              <Badge key={genre} variant="outline">
+                {genre}
+              </Badge>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Bio y cumpleaños */}
+      {user.bio || user.birthday ? (
+        <section className="space-y-2">
+          {user.bio ? <p className="text-sm text-foreground/90 leading-relaxed">{user.bio}</p> : null}
+          {user.birthday ? (
+            <p className="text-xs text-muted-foreground">
+              🎂 {formatDate(user.birthday, { year: undefined })}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Mis sugerencias */}
       <section className="space-y-4">

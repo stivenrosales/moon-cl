@@ -1,38 +1,28 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { requireAdmin } from "@/server/auth-helpers";
+import { setCurrentBookTx } from "@/server/services/club";
 
 export async function setUserRole(userId: string, role: Role) {
   const admin = await requireAdmin();
-  if (admin.id === userId && role !== "ADMIN") {
+  const parsedUserId = z.string().cuid().parse(userId);
+  if (admin.id === parsedUserId && role !== "ADMIN") {
     throw new Error("No puedes degradarte a ti mismo");
   }
-  await db.user.update({ where: { id: userId }, data: { role } });
+  await db.user.update({ where: { id: parsedUserId }, data: { role } });
   revalidatePath("/admin");
 }
 
 export async function setBookAsCurrent(bookId: string) {
   await requireAdmin();
-  await db.$transaction([
-    db.book.updateMany({
-      where: { isCurrent: true },
-      data: { isCurrent: false, status: "FINISHED", finishedAt: new Date() },
-    }),
-    db.book.update({
-      where: { id: bookId },
-      data: {
-        isCurrent: true,
-        status: "CURRENT",
-        startedAt: new Date(),
-        finishedAt: null,
-      },
-    }),
-  ]);
+  const parsedBookId = z.string().cuid().parse(bookId);
+  await db.$transaction((tx) => setCurrentBookTx(tx, parsedBookId));
   revalidatePath("/dashboard");
-  revalidatePath(`/libros/${bookId}`);
+  revalidatePath(`/libros/${parsedBookId}`);
   revalidatePath("/biblioteca");
   revalidatePath("/admin");
 }

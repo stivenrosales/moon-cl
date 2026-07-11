@@ -21,13 +21,13 @@ export default async function BibliotecaPage() {
   const others = books.filter((b) => !b.isCurrent && b.status !== "FINISHED");
 
   return (
-    <div className="space-y-8 md:space-y-10">
+    <div className="space-y-6 md:space-y-8">
       <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent">Memoria del club</span>
-        <h1 className="h1-display display mt-2">
+        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">Memoria del club</span>
+        <h1 className="display text-3xl md:text-4xl leading-[1.05] tracking-tight mt-1.5">
           La <span className="hand-script italic text-primary">biblioteca</span>
         </h1>
-        <p className="mt-3 max-w-xl text-muted-foreground">
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
           Todos los libros que han pasado, pasan o pasarán por nuestra mesa.
         </p>
       </header>
@@ -51,7 +51,7 @@ export default async function BibliotecaPage() {
       ) : null}
 
       {books.length === 0 ? (
-        <Card className="p-10 text-center">
+        <Card className="p-8 text-center">
           <p className="hand-script text-2xl">Todavía no hay libros</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Cuando se sugiera el primero, aparecerá aquí.
@@ -64,7 +64,7 @@ export default async function BibliotecaPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <h2 className="text-xs uppercase tracking-[0.32em] text-muted-foreground">{title}</h2>
       {children}
     </section>
@@ -83,7 +83,7 @@ interface BookGridItem {
 
 function BookGrid({ books }: { books: BookGridItem[] }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-5">
       {books.map((b) => {
         const avg = b.ratings.length
           ? b.ratings.reduce((s, r) => s + r.stars, 0) / b.ratings.length

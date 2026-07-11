@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { commentSchema } from "@/lib/validators";
+import { commentSchema, idSchema } from "@/lib/validators";
 import { requireUser, requireModerator } from "@/server/auth-helpers";
 
 export async function postComment(input: unknown) {
@@ -33,7 +33,8 @@ export async function postComment(input: unknown) {
 
 export async function deleteComment(id: string) {
   const user = await requireUser();
-  const comment = await db.comment.findUnique({ where: { id } });
+  const parsedId = idSchema.parse(id);
+  const comment = await db.comment.findUnique({ where: { id: parsedId } });
   if (!comment) throw new Error("Comentario no encontrado");
 
   const canDelete =
@@ -43,7 +44,7 @@ export async function deleteComment(id: string) {
   if (!canDelete) throw new Error("No autorizado");
 
   await db.comment.update({
-    where: { id },
+    where: { id: parsedId },
     data: { deletedAt: new Date(), content: "[eliminado]" },
   });
   revalidatePath(`/libros/${comment.bookId}`);
@@ -51,17 +52,18 @@ export async function deleteComment(id: string) {
 
 export async function moderateComment(id: string, action: "delete" | "unspoiler" | "spoiler") {
   await requireModerator();
-  const comment = await db.comment.findUnique({ where: { id } });
+  const parsedId = idSchema.parse(id);
+  const comment = await db.comment.findUnique({ where: { id: parsedId } });
   if (!comment) throw new Error("Comentario no encontrado");
 
   if (action === "delete") {
     await db.comment.update({
-      where: { id },
+      where: { id: parsedId },
       data: { deletedAt: new Date(), content: "[moderado]" },
     });
   } else {
     await db.comment.update({
-      where: { id },
+      where: { id: parsedId },
       data: { isSpoiler: action === "spoiler" },
     });
   }

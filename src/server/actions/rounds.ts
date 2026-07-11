@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { roundSchema } from "@/lib/validators";
-import { requireAdmin, requireUser } from "@/server/auth-helpers";
+import { requireAdmin } from "@/server/auth-helpers";
+import { closeRoundTx } from "@/server/services/club";
 
 export async function createRound(input: unknown) {
   const user = await requireAdmin();
@@ -52,48 +54,65 @@ export async function updateRound(id: string, input: unknown) {
 
 export async function openRound(id: string) {
   await requireAdmin();
-  await db.round.update({ where: { id }, data: { status: "OPEN" } });
-  revalidatePath(`/rondas/${id}`);
+  const parsedId = z.string().cuid().parse(id);
+  await db.round.update({ where: { id: parsedId }, data: { status: "OPEN" } });
+  revalidatePath(`/rondas/${parsedId}`);
   revalidatePath("/rondas");
   revalidatePath("/admin");
   revalidatePath("/dashboard");
 }
 
+/**
+ * Cierre atómico de la ronda: elige ganador por votos, lo pone como lectura
+ * en curso del club y archiva a los perdedores. Toda la operación corre
+ * dentro de una transacción para evitar condiciones de carrera con votos
+ * o sugerencias de último momento.
+ */
 export async function closeRound(id: string) {
   await requireAdmin();
-  // Calcula ganador con más votos.
-  const suggestions = await db.bookSuggestion.findMany({
-    where: { roundId: id },
-    include: { _count: { select: { votes: true } } },
-    orderBy: [{ votes: { _count: "desc" } }, { createdAt: "asc" }],
-  });
+  const parsedId = z.string().cuid().parse(id);
 
-  const winnerSuggestion = suggestions[0];
-  await db.round.update({
-    where: { id },
-    data: {
-      status: "CLOSED",
-      winnerBookId: winnerSuggestion?.bookId ?? null,
-    },
-  });
+  const winner = await db.$transaction((tx) => closeRoundTx(tx, parsedId));
 
-  revalidatePath(`/rondas/${id}`);
+  revalidatePath(`/rondas/${parsedId}`);
   revalidatePath("/rondas");
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+  revalidatePath("/biblioteca");
+  if (winner) revalidatePath(`/libros/${winner.bookId}`);
 }
 
 export async function deleteRound(id: string) {
   await requireAdmin();
-  await db.round.delete({ where: { id } });
+  const parsedId = z.string().cuid().parse(id);
+  await db.round.delete({ where: { id: parsedId } });
   revalidatePath("/rondas");
   revalidatePath("/admin");
 }
 
-export async function getActiveRound() {
-  await requireUser();
-  return db.round.findFirst({
-    where: { status: "OPEN" },
-    orderBy: { endsAt: "asc" },
+/**
+ * Atomic: cierra la ronda (si no está cerrada), marca este libro como ganador
+ * y lo pone como lectura en curso (FINISHing cualquier libro previo en curso).
+ * Pensado para que el admin apruebe la lectura desde la propia vista de ronda.
+ */
+export async function chooseRoundWinner(suggestionId: string) {
+  await requireAdmin();
+  const parsedId = z.string().cuid().parse(suggestionId);
+
+  const suggestion = await db.bookSuggestion.findUnique({
+    where: { id: parsedId },
+    select: { id: true, bookId: true, roundId: true },
   });
+  if (!suggestion) throw new Error("Sugerencia no encontrada");
+
+  await db.$transaction((tx) =>
+    closeRoundTx(tx, suggestion.roundId, suggestion.bookId),
+  );
+
+  revalidatePath(`/rondas/${suggestion.roundId}`);
+  revalidatePath("/rondas");
+  revalidatePath("/dashboard");
+  revalidatePath("/biblioteca");
+  revalidatePath(`/libros/${suggestion.bookId}`);
+  revalidatePath("/admin");
 }

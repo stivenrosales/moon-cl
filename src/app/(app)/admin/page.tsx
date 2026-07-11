@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,8 @@ import { RoundStatusBadge } from "@/components/round-status-badge";
 import { NewRoundForm } from "@/components/admin/round-form";
 import { RoundActions } from "@/components/admin/round-actions";
 import { NewMeetingForm } from "@/components/admin/meeting-form";
+import { MeetingEditDialog } from "@/components/admin/meeting-edit-dialog";
+import { MEETING_TYPE_LABELS, MEETING_TYPE_BADGE_VARIANT } from "@/lib/meeting-types";
 import { RoleSelect } from "@/components/admin/role-select";
 import { BookStateButtons } from "@/components/admin/book-state-buttons";
 import { formatDate, getInitials } from "@/lib/utils";
@@ -18,7 +20,7 @@ import { isModeratorOrAbove } from "@/lib/permissions";
 export const metadata = { title: "Panel admin" };
 
 export default async function AdminPage() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   if (!isModeratorOrAbove(session.user.role)) redirect("/dashboard");
 
@@ -46,7 +48,7 @@ export default async function AdminPage() {
   return (
     <div className="space-y-8 md:space-y-10">
       <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent">Cabina del club</span>
+        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">Cabina del club</span>
         <h1 className="h1-display display mt-2">
           Panel <span className="hand-script italic text-primary">admin</span>
         </h1>
@@ -111,16 +113,22 @@ export default async function AdminPage() {
               ) : (
                 <ul className="mt-4 divide-y divide-border/60">
                   {meetings.map((m) => (
-                    <li key={m.id} className="py-3 flex items-center gap-3">
-                      <Link href={`/reuniones/${m.id}`} className="font-medium hover:text-primary truncate max-w-[200px]">
+                    <li key={m.id} className="py-3 flex items-center gap-3 flex-wrap">
+                      <Badge variant={MEETING_TYPE_BADGE_VARIANT[m.type]}>
+                        {MEETING_TYPE_LABELS[m.type]}
+                      </Badge>
+                      <Link href={`/reuniones/${m.id}`} className="font-medium hover:text-primary truncate max-w-[180px]">
                         {m.title}
                       </Link>
                       <span className="text-xs text-muted-foreground">
                         {formatDate(m.startsAt)}
                       </span>
-                      <span className="ml-auto text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {m._count.rsvps} RSVP
                       </span>
+                      <div className="ml-auto">
+                        <MeetingEditDialog meeting={m} books={bookOptions} />
+                      </div>
                     </li>
                   ))}
                 </ul>

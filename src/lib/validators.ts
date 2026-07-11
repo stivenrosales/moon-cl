@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { GENEROS } from "@/lib/genres";
 
 export const emailSchema = z.object({
   email: z.string().email("Ingresa un correo válido"),
 });
+
+export const idSchema = z.string().cuid();
 
 export const bookInputSchema = z.object({
   title: z.string().min(1).max(280),
@@ -13,6 +16,17 @@ export const bookInputSchema = z.object({
   publishedYear: z.number().int().min(0).max(2100).optional().nullable(),
   googleBooksId: z.string().max(60).optional().nullable(),
   isbn: z.string().max(20).optional().nullable(),
+});
+
+export const bookUpdateSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(280),
+  authors: z.array(z.string().max(120)).default([]),
+  coverUrl: z.string().url().optional().nullable().or(z.literal("")),
+  description: z.string().max(8000).optional().nullable(),
+  pageCount: z.number().int().positive().max(20000).optional().nullable(),
+  publishedYear: z.number().int().min(0).max(2100).optional().nullable(),
+  isbn: z.string().max(20).optional().nullable().or(z.literal("")),
 });
 
 export const suggestBookSchema = bookInputSchema.extend({
@@ -57,18 +71,62 @@ export const meetingSchema = z
     title: z.string().min(2).max(180),
     description: z.string().max(2000).optional().nullable(),
     bookId: z.string().optional().nullable(),
+    type: z.enum(["REUNION", "CINE", "POESIA", "OTRO"]).default("REUNION"),
     startsAt: z.coerce.date(),
     endsAt: z.coerce.date().optional().nullable(),
     location: z.string().max(280).optional().nullable(),
     meetingUrl: z.string().url().optional().nullable().or(z.literal("")),
     isVirtual: z.boolean().default(false),
   })
-  .refine(
-    (d) => d.isVirtual ? !!d.meetingUrl : !!d.location || !!d.meetingUrl,
-    { path: ["location"], message: "Indica un lugar o un enlace" },
-  );
+  .refine((d) => !d.isVirtual || !!d.meetingUrl, {
+    path: ["meetingUrl"],
+    message: "Indica un enlace para la reunión virtual",
+  })
+  .refine((d) => d.isVirtual || !!d.location || !!d.meetingUrl, {
+    path: ["location"],
+    message: "Indica un lugar o un enlace",
+  });
 
 export const rsvpSchema = z.object({
   meetingId: z.string().min(1),
   status: z.enum(["YES", "NO", "MAYBE"]),
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Onboarding 18+ y perfil (Paquete C)
+// ─────────────────────────────────────────────────────────────────────────
+
+export const onboardingSchema = z.object({
+  ageConfirmed: z.literal(true, {
+    message: "Debes confirmar que tienes 18 años o más",
+  }),
+  favoriteGenres: z.array(z.enum(GENEROS)).max(10).optional().default([]),
+});
+
+export const profileUpdateSchema = z.object({
+  name: z.string().min(2).max(60),
+  bio: z.string().max(280).optional().nullable(),
+  birthday: z.coerce.date().optional().nullable(),
+  favoriteGenres: z.array(z.enum(GENEROS)).max(10).optional().default([]),
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Estanterías personales (Paquete E)
+// ─────────────────────────────────────────────────────────────────────────
+
+export const shelfStatusSchema = z.enum(["READING", "WANT_TO_READ", "FINISHED"]);
+
+export const addToShelfSchema = bookInputSchema.extend({
+  status: shelfStatusSchema,
+});
+
+export const moveShelfSchema = z.object({
+  bookId: z.string().min(1),
+  status: shelfStatusSchema,
+});
+
+export const updateMyBookSchema = z.object({
+  bookId: z.string().min(1),
+  currentPage: z.number().int().positive().max(20000).optional().nullable(),
+  currentChapter: z.number().int().positive().max(2000).optional().nullable(),
 });

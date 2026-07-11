@@ -3,72 +3,76 @@
 @tailwind utilities;
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Moon Club de Lectura — Editorial cósmico
-   Paleta: midnight aubergine + lavender + parchment cream + tarnished gold
+   Moon Club de Lectura — Identidad Wisteria × Lemon
+   Paleta: hue wisteria (~279–283°) para toda la tinta/superficies;
+   Lemon (~55–60°) reservado como color de señal (countdowns, no-leídos,
+   estrellas, insignias) — nunca como texto sobre fondo claro.
    ────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* Light: pergamino crema + aubergine + lavanda */
-    --background: 36 47% 95%;            /* #F5EFE2  parchment cream */
-    --foreground: 268 52% 16%;           /* #2A1740  deep aubergine */
+    /* Light: pergamino wisteria — superficies casi blancas, tinta profunda */
+    --background: 264 56% 98%;           /* #FAF8FD */
+    --foreground: 259 33% 17%;           /* #261D3A */
 
-    --card: 36 56% 97%;
-    --card-foreground: 268 52% 16%;
+    --card: 0 0% 100%;                   /* #FFFFFF */
+    --card-foreground: 259 33% 17%;
 
-    --popover: 36 56% 97%;
-    --popover-foreground: 268 52% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 259 33% 17%;
 
-    --primary: 268 48% 56%;              /* #9B73CE  lavender */
-    --primary-foreground: 36 47% 96%;
+    --primary: 279 31% 44%;              /* #7B4E93  wisteria profunda (AA) */
+    --primary-foreground: 264 56% 98%;   /* #FAF8FD */
 
-    --secondary: 268 30% 88%;
-    --secondary-foreground: 268 52% 22%;
+    --secondary: 270 35% 94%;
+    --secondary-foreground: 259 33% 17%;
 
-    --muted: 268 22% 90%;
-    --muted-foreground: 268 18% 38%;
+    --muted: 270 30% 95%;
+    --muted-foreground: 259 14% 44%;     /* #6A6080 */
 
-    --accent: 41 50% 64%;                /* #D4B770  tarnished gold */
-    --accent-foreground: 268 52% 14%;
+    --accent: 55 87% 70%;                /* #F5E96E  lemon profundizado para fill visible sobre blanco */
+    --accent-foreground: 276 40% 16%;    /* #2B1838  tinta wisteria oscura */
+    --accent-text: 279 31% 44%;          /* #7B4E93  — kickers/texto de acento sobre fondo claro */
 
-    --destructive: 0 65% 48%;
+    --destructive: 4 48% 47%;            /* #B3473F  rojo real (wisteria nunca lee como error) */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 268 24% 82%;
-    --input: 268 24% 82%;
-    --ring: 268 48% 56%;
+    --border: 270 42% 91%;               /* #E6DFF2 */
+    --input: 270 42% 91%;
+    --ring: 279 31% 44%;                 /* = primary */
 
     --radius: 0.875rem;
   }
 
   .dark {
-    /* Dark: midnight aubergine + lavanda viva + crema cálida para texto */
-    --background: 263 38% 8%;            /* #11091F  midnight */
-    --foreground: 36 38% 92%;            /* #F2E8D6  parchment glow */
+    /* Dark: el modo por defecto de la app — ancla del contrato visual */
+    --background: 263 36% 9%;            /* #140E1E */
+    --foreground: 267 48% 95%;           /* #F3EEF9 */
 
-    --card: 263 32% 11%;
-    --card-foreground: 36 38% 92%;
+    --card: 258 39% 14%;                 /* #1D1530 */
+    --card-foreground: 267 48% 95%;
 
-    --popover: 263 36% 10%;
-    --popover-foreground: 36 38% 92%;
+    --popover: 258 39% 14%;
+    --popover-foreground: 267 48% 95%;
 
-    --primary: 268 60% 70%;              /* lavanda viva */
-    --primary-foreground: 263 38% 10%;
+    --primary: 283 39% 73%;              /* #C69FD5  wisteria */
+    --primary-foreground: 276 40% 16%;   /* #2B1838 */
 
-    --secondary: 263 28% 17%;
-    --secondary-foreground: 36 38% 92%;
+    --secondary: 260 30% 19%;
+    --secondary-foreground: 267 48% 95%;
 
-    --muted: 263 24% 15%;
-    --muted-foreground: 268 26% 70%;
+    --muted: 260 26% 16%;
+    --muted-foreground: 257 24% 68%;     /* #A69BC2 */
 
-    --accent: 41 56% 64%;                /* gold */
-    --accent-foreground: 263 38% 10%;
+    --accent: 60 93% 89%;                /* #FDFDC9  lemon — solo señal */
+    --accent-foreground: 55 59% 15%;     /* #3F3B10 */
+    --accent-text: 60 93% 89%;           /* #FDFDC9  — kickers/texto de acento sobre fondo oscuro */
 
-    --destructive: 0 60% 52%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 4 67% 73%;            /* #E8918B */
+    --destructive-foreground: 4 45% 14%;
 
-    --border: 263 24% 20%;
-    --input: 263 24% 22%;
-    --ring: 268 60% 70%;
+    --border: 259 32% 23%;               /* #34284E */
+    --input: 259 32% 23%;
+    --ring: 283 39% 73%;                 /* = primary */
   }
 }
 
@@ -153,7 +157,7 @@
   }
 
   .gold-shimmer {
-    background: linear-gradient(110deg, hsl(var(--accent) / 0.7), hsl(var(--accent)) 35%, hsl(36 60% 90%) 50%, hsl(var(--accent)) 65%, hsl(var(--accent) / 0.7));
+    background: linear-gradient(110deg, hsl(var(--accent) / 0.7), hsl(var(--accent)) 35%, hsl(57 90% 92%) 50%, hsl(var(--accent)) 65%, hsl(var(--accent) / 0.7));
     background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;

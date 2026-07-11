@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: ["class"],
@@ -51,6 +52,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        "accent-text": "hsl(var(--accent-text))",
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -58,23 +60,6 @@ const config: Config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        moon: {
-          50: "#FAF7FF",
-          100: "#F1EAFC",
-          200: "#E2D3F7",
-          300: "#CDB3F0",
-          400: "#B392E0",
-          500: "#9B73CE",
-          600: "#8054B8",
-          700: "#653F94",
-          800: "#4D3170",
-          900: "#33214B",
-          950: "#1B1230",
-        },
-        gold: {
-          DEFAULT: "#D4B770",
-          soft: "#E9D6A1",
         },
       },
       borderRadius: {
@@ -114,7 +99,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 };
 
 export default config;

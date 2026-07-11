@@ -21,7 +21,7 @@ const Label = React.forwardRef<React.ElementRef<typeof LabelPrimitive.Root>, Lab
     >
       {children}
       {required ? (
-        <span aria-hidden className="text-accent">·</span>
+        <span aria-hidden className="text-accent-text">·</span>
       ) : null}
       {optional ? (
         <span className="text-muted-foreground/60 normal-case tracking-normal text-[10px]">

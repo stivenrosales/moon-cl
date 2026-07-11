@@ -12,10 +12,14 @@ declare module "next-auth" {
     user: {
       id: string;
       role: Role;
+      onboardedAt: Date | null;
+      birthday: Date | null;
     } & DefaultSession["user"];
   }
   interface User {
     role?: Role;
+    onboardedAt?: Date | null;
+    birthday?: Date | null;
   }
 }
 
@@ -89,6 +93,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = user.id;
         session.user.role = (user as { role?: Role }).role ?? "MEMBER";
+        // Con session strategy "database" el adapter resuelve el User
+        // completo (incluye onboardedAt/birthday) en cada auth(), así que
+        // no hace falta una query aparte para el gate de onboarding.
+        session.user.onboardedAt =
+          (user as { onboardedAt?: Date | null }).onboardedAt ?? null;
+        session.user.birthday = (user as { birthday?: Date | null }).birthday ?? null;
       }
       return session;
     },

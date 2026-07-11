@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BookOpen, Vote, Library, CalendarDays, User2, Shield } from "lucide-react";
+import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, User2, Shield, Home } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { MoonLogo } from "@/components/moon-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -33,12 +33,14 @@ const links = [
   { href: "/dashboard", label: "Inicio", icon: BookOpen },
   { href: "/rondas", label: "Votación", icon: Vote },
   { href: "/biblioteca", label: "Biblioteca", icon: Library },
+  { href: "/mi-biblioteca", label: "Mi biblioteca", icon: BookMarked },
   { href: "/reuniones", label: "Reuniones", icon: CalendarDays },
 ];
 
 export function Nav({ user }: NavProps) {
   const pathname = usePathname();
   const isAdmin = user.role === "ADMIN" || user.role === "MODERATOR";
+  const inAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
@@ -101,9 +103,15 @@ export function Nav({ user }: NavProps) {
                 <Link href="/perfil"><User2 className="h-4 w-4" /> Mi perfil</Link>
               </DropdownMenuItem>
               {isAdmin ? (
-                <DropdownMenuItem asChild>
-                  <Link href="/admin"><Shield className="h-4 w-4" /> Panel admin</Link>
-                </DropdownMenuItem>
+                inAdmin ? (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard"><Home className="h-4 w-4" /> Vista normal</Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin"><Shield className="h-4 w-4" /> Panel admin</Link>
+                  </DropdownMenuItem>
+                )
               ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => signOut({ callbackUrl: "/" })}>

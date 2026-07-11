@@ -12,15 +12,19 @@ datasource db {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role      @default(MEMBER)
-  bio           String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  role           Role      @default(MEMBER)
+  bio            String?
+  birthday       DateTime? @db.Date
+  favoriteGenres String[]  @default([])
+  ageConfirmedAt DateTime?
+  onboardedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   accounts        Account[]
   sessions        Session[]
@@ -32,6 +36,7 @@ model User {
   progressUpdates ReadingProgress[]
   createdRounds   Round[]           @relation("RoundCreator")
   createdMeetings Meeting[]         @relation("MeetingCreator")
+  userBooks       UserBook[]
 }
 
 enum Role {
@@ -83,6 +88,7 @@ model Book {
   id            String     @id @default(cuid())
   title         String
   authors       String[]
+  categories    String[]   @default([])
   coverUrl      String?
   description   String?    @db.Text
   pageCount     Int?
@@ -102,6 +108,9 @@ model Book {
   progressUpdates ReadingProgress[]
   meetings        Meeting[]
   wonRound        Round?            @relation("RoundWinner")
+  userBooks       UserBook[]
+
+  @@index([isCurrent])
 }
 
 enum BookStatus {
@@ -126,6 +135,8 @@ model Round {
   winner      Book?            @relation("RoundWinner", fields: [winnerBookId], references: [id])
   creator     User?            @relation("RoundCreator", fields: [creatorId], references: [id])
   suggestions BookSuggestion[]
+
+  @@index([status])
 }
 
 enum RoundStatus {
@@ -206,6 +217,7 @@ model ReadingProgress {
   bookId      String
   userId      String
   currentPage Int
+  chapter     Int?
   note        String?
   createdAt   DateTime @default(now())
 
@@ -217,24 +229,33 @@ model ReadingProgress {
 }
 
 model Meeting {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   title       String
-  description String?   @db.Text
+  description String?     @db.Text
   bookId      String?
+  type        MeetingType @default(REUNION)
   startsAt    DateTime
   endsAt      DateTime?
   location    String?
   meetingUrl  String?
-  isVirtual   Boolean   @default(false)
+  isVirtual   Boolean     @default(false)
+  remindedAt  DateTime?
   creatorId   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   book    Book?  @relation(fields: [bookId], references: [id], onDelete: SetNull)
   creator User?  @relation("MeetingCreator", fields: [creatorId], references: [id])
   rsvps   Rsvp[]
 
   @@index([startsAt])
+}
+
+enum MeetingType {
+  REUNION
+  CINE
+  POESIA
+  OTRO
 }
 
 model Rsvp {
@@ -256,4 +277,29 @@ enum RsvpStatus {
   YES
   NO
   MAYBE
+}
+
+model UserBook {
+  id             String      @id @default(cuid())
+  userId         String
+  bookId         String
+  status         ShelfStatus
+  currentPage    Int?
+  currentChapter Int?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([userId, status])
+}
+
+enum ShelfStatus {
+  READING
+  WANT_TO_READ
+  FINISHED
 }

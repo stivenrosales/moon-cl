@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { quoteSchema, idSchema } from "@/lib/validators";
 import { requireUser } from "@/server/auth-helpers";
 
@@ -22,8 +23,8 @@ export async function createQuote(input: unknown) {
     },
   });
 
-  revalidatePath("/comunidad");
-  revalidatePath(`/libros/${data.bookId}`);
+  revalidatePath(routes.club());
+  revalidatePath(routes.libro(data.bookId));
   return quote;
 }
 
@@ -39,8 +40,8 @@ export async function deleteQuote(id: string) {
 
   await db.quote.delete({ where: { id: parsedId } });
 
-  revalidatePath("/comunidad");
-  revalidatePath(`/libros/${quote.bookId}`);
+  revalidatePath(routes.club());
+  revalidatePath(routes.libro(quote.bookId));
 }
 
 export async function toggleQuoteLike(quoteId: string) {
@@ -60,7 +61,7 @@ export async function toggleQuoteLike(quoteId: string) {
     await db.quoteLike.create({ data: { quoteId: parsedId, userId: user.id } });
   }
 
-  revalidatePath("/comunidad");
-  revalidatePath(`/libros/${quote.bookId}`);
+  revalidatePath(routes.club());
+  revalidatePath(routes.libro(quote.bookId));
   return { liked: !existing };
 }

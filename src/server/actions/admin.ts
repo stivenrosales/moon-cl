@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { routes } from "@/lib/routes";
 import { requireAdmin } from "@/server/auth-helpers";
 import { setCurrentBookTx } from "@/server/services/club";
 
@@ -14,17 +15,17 @@ export async function setUserRole(userId: string, role: Role) {
     throw new Error("No puedes degradarte a ti mismo");
   }
   await db.user.update({ where: { id: parsedUserId }, data: { role } });
-  revalidatePath("/admin");
+  revalidatePath(routes.admin());
 }
 
 export async function setBookAsCurrent(bookId: string) {
   await requireAdmin();
   const parsedBookId = z.string().cuid().parse(bookId);
   await db.$transaction((tx) => setCurrentBookTx(tx, parsedBookId));
-  revalidatePath("/dashboard");
-  revalidatePath(`/libros/${parsedBookId}`);
-  revalidatePath("/biblioteca");
-  revalidatePath("/admin");
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.libro(parsedBookId));
+  revalidatePath(routes.leer());
+  revalidatePath(routes.admin());
 }
 
 export async function markBookAsFinished(bookId: string) {
@@ -33,8 +34,8 @@ export async function markBookAsFinished(bookId: string) {
     where: { id: bookId },
     data: { isCurrent: false, status: "FINISHED", finishedAt: new Date() },
   });
-  revalidatePath("/dashboard");
-  revalidatePath(`/libros/${bookId}`);
-  revalidatePath("/biblioteca");
-  revalidatePath("/admin");
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.libro(bookId));
+  revalidatePath(routes.leer());
+  revalidatePath(routes.admin());
 }

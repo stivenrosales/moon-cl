@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import {
   addToShelfSchema,
   idSchema,
@@ -11,6 +12,7 @@ import {
 import { requireUser } from "@/server/auth-helpers";
 import { findOrCreateBook } from "@/server/services/books";
 import { computeShelfTransition } from "@/server/services/shelf-transition";
+import { updateProgress } from "@/server/actions/progress";
 
 /**
  * Agrega un libro a la estantería del usuario. Busca o crea el Book (mismo
@@ -52,7 +54,7 @@ export async function addBookToShelf(input: unknown) {
     },
   });
 
-  revalidatePath("/mi-biblioteca");
+  revalidatePath(routes.leer());
   return userBook;
 }
 
@@ -83,14 +85,67 @@ export async function moveShelf(input: unknown) {
     },
   });
 
-  revalidatePath("/mi-biblioteca");
+  revalidatePath(routes.leer());
   return updated;
 }
 
 /**
+ * Empieza a leer un libro que YA existe en el catálogo, sin exigir que el
+ * usuario tenga un UserBook previo (a diferencia de moveShelf) y sin crear
+ * un Book nuevo por título (a diferencia de addBookToShelf). Es la puerta de
+ * "Lo voy a leer" en el estado "sin-empezar" de la card héroe de /hoy: el
+ * libro resuelto por loadToday ya tiene id, así que solo hace falta el
+ * upsert del UserBook a READING.
+ */
+export async function startReading(bookId: string) {
+  const user = await requireUser();
+  const parsedBookId = idSchema.parse(bookId);
+
+  const book = await db.book.findUnique({ where: { id: parsedBookId } });
+  if (!book) throw new Error("Libro no encontrado");
+
+  const existing = await db.userBook.findUnique({
+    where: { userId_bookId: { userId: user.id, bookId: parsedBookId } },
+  });
+
+  const transition = computeShelfTransition(
+    {
+      status: existing?.status ?? null,
+      startedAt: existing?.startedAt ?? null,
+      finishedAt: existing?.finishedAt ?? null,
+    },
+    "READING",
+  );
+
+  const userBook = await db.userBook.upsert({
+    where: { userId_bookId: { userId: user.id, bookId: parsedBookId } },
+    create: {
+      userId: user.id,
+      bookId: parsedBookId,
+      status: transition.status,
+      startedAt: transition.startedAt,
+      finishedAt: transition.finishedAt,
+    },
+    update: {
+      status: transition.status,
+      startedAt: transition.startedAt,
+      finishedAt: transition.finishedAt,
+    },
+  });
+
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.leer());
+  revalidatePath(routes.libro(parsedBookId));
+  return userBook;
+}
+
+/**
  * Actualiza la página/capítulo propios del usuario para un libro de su
- * estantería. No confundir con updateProgress (avance compartido del libro
- * en curso del club, en src/server/actions/progress.ts).
+ * estantería. Si se declara currentPage, delega en updateProgress: es la
+ * única puerta de escritura del avance, la que también registra la bitácora
+ * ReadingProgress (append-only) dentro de su transacción, evitando que esta
+ * estantería y esa bitácora diverjan. Si solo se declara currentChapter (sin
+ * página), ajusta el UserBook directamente porque la bitácora exige página.
  */
 export async function updateMyBook(input: unknown) {
   const user = await requireUser();
@@ -101,15 +156,21 @@ export async function updateMyBook(input: unknown) {
   });
   if (!existing) throw new Error("Ese libro no está en tu estantería");
 
+  if (data.currentPage != null) {
+    const { userBook } = await updateProgress({
+      bookId: data.bookId,
+      currentPage: data.currentPage,
+      chapter: data.currentChapter ?? null,
+    });
+    return userBook;
+  }
+
   const updated = await db.userBook.update({
     where: { id: existing.id },
-    data: {
-      currentPage: data.currentPage ?? existing.currentPage,
-      currentChapter: data.currentChapter ?? existing.currentChapter,
-    },
+    data: { currentChapter: data.currentChapter ?? existing.currentChapter },
   });
 
-  revalidatePath("/mi-biblioteca");
+  revalidatePath(routes.leer());
   return updated;
 }
 
@@ -123,5 +184,5 @@ export async function removeFromShelf(bookId: string) {
   if (!existing) throw new Error("Ese libro no está en tu estantería");
 
   await db.userBook.delete({ where: { id: existing.id } });
-  revalidatePath("/mi-biblioteca");
+  revalidatePath(routes.leer());
 }

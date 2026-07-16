@@ -19,13 +19,14 @@ import { KahootActivityActions } from "@/components/admin/kahoot-activity-action
 import { ReportsPanel } from "@/components/admin/reports-panel";
 import { formatDate, getInitials } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
+import { routes } from "@/lib/routes";
 
 export const metadata = { title: "Panel admin" };
 
 export default async function AdminPage() {
   const session = await getSession();
-  if (!session?.user?.id) redirect("/login");
-  if (!isModeratorOrAbove(session.user.role)) redirect("/dashboard");
+  if (!session?.user?.id) redirect(routes.login());
+  if (!isModeratorOrAbove(session.user.role)) redirect(routes.hoy());
 
   const isAdmin = session.user.role === "ADMIN";
   // isModeratorOrAbove ya filtró en el redirect de arriba: quien llega acá
@@ -115,7 +116,7 @@ export default async function AdminPage() {
                   {rounds.map((r) => (
                     <li key={r.id} className="py-3 flex items-center gap-3 flex-wrap">
                       <RoundStatusBadge status={r.status} />
-                      <Link href={`/rondas/${r.id}`} className="font-medium hover:text-primary truncate max-w-[180px]">
+                      <Link href={routes.ronda(r.id)} className="font-medium hover:text-primary truncate max-w-[180px]">
                         {r.title}
                       </Link>
                       <span className="text-xs text-muted-foreground">
@@ -157,7 +158,7 @@ export default async function AdminPage() {
                       <Badge variant={MEETING_TYPE_BADGE_VARIANT[m.type]}>
                         {MEETING_TYPE_LABELS[m.type]}
                       </Badge>
-                      <Link href={`/reuniones/${m.id}`} className="font-medium hover:text-primary truncate max-w-[180px]">
+                      <Link href={routes.reunion(m.id)} className="font-medium hover:text-primary truncate max-w-[180px]">
                         {m.title}
                       </Link>
                       <span className="text-xs text-muted-foreground">
@@ -231,7 +232,7 @@ export default async function AdminPage() {
 
       {/* Libros */}
       {isAdmin ? (
-        <section className="space-y-4">
+        <section id="libros" className="space-y-4">
           <h2 className="display text-2xl">Libros del club</h2>
           <Card className="p-6">
             {books.length === 0 ? (
@@ -243,7 +244,7 @@ export default async function AdminPage() {
                     <BookCover src={b.coverUrl} title={b.title} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/libros/${b.id}`} className="font-medium hover:text-primary truncate">
+                        <Link href={routes.libro(b.id)} className="font-medium hover:text-primary truncate">
                           {b.title}
                         </Link>
                         {b.isCurrent ? <Badge variant="default">En curso</Badge> : null}
@@ -264,7 +265,7 @@ export default async function AdminPage() {
 
       {/* Roles */}
       {isAdmin ? (
-        <section className="space-y-4">
+        <section id="miembros" className="space-y-4">
           <h2 className="display text-2xl">Miembros del club</h2>
           <Card className="p-6">
             <ul className="divide-y divide-border/60">

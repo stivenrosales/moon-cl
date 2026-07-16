@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label, Field } from "@/components/ui/label";
 import { GENEROS } from "@/lib/genres";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import { completeOnboarding } from "@/server/actions/profile";
 
 const MAX_GENRES = 10;
@@ -47,7 +48,7 @@ export function OnboardingForm({ initialName }: OnboardingFormProps) {
         name: nameValid ? name.trim() : undefined,
       });
       toast.success("Preferencias guardadas");
-      router.push("/dashboard");
+      router.push(routes.hoy());
       router.refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo guardar";

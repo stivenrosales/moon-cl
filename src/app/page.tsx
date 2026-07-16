@@ -5,10 +5,11 @@ import { MoonLogo } from "@/components/moon-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
+import { routes } from "@/lib/routes";
 
 export default async function Landing() {
   const session = await getSession();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect(routes.hoy());
 
   return (
     <div className="relative">
@@ -25,7 +26,7 @@ export default async function Landing() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button asChild size="sm" variant="outline">
-            <Link href="/login">Entrar</Link>
+            <Link href={routes.login()}>Entrar</Link>
           </Button>
         </div>
       </header>
@@ -57,7 +58,7 @@ export default async function Landing() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
-                <Link href="/login">
+                <Link href={routes.login()}>
                   Entrar al club
                   <ArrowRight className="h-4 w-4" />
                 </Link>
@@ -138,7 +139,7 @@ export default async function Landing() {
               <span className="italic">empieza con un voto</span>.
             </h3>
             <Button asChild size="lg" variant="gold">
-              <Link href="/login">
+              <Link href={routes.login()}>
                 Recibir mi enlace mágico
                 <ArrowRight className="h-4 w-4" />
               </Link>

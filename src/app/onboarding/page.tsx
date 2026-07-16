@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { routes } from "@/lib/routes";
 import { OnboardingForm } from "./onboarding-form";
 
 // Vive FUERA del grupo (app) a propósito: el layout de (app) redirige acá
@@ -11,8 +12,8 @@ export const metadata = { title: "Bienvenida" };
 
 export default async function OnboardingPage() {
   const session = await getSession();
-  if (!session?.user?.id) redirect("/login");
-  if (session.user.onboardedAt) redirect("/dashboard");
+  if (!session?.user?.id) redirect(routes.login());
+  if (session.user.onboardedAt) redirect(routes.hoy());
 
   return (
     <div className="container flex min-h-dvh items-center justify-center py-16">

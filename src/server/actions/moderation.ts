@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { Prisma, type ReportStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { idSchema, reportSchema } from "@/lib/validators";
+import { routes } from "@/lib/routes";
 import { requireModerator, requireUser } from "@/server/auth-helpers";
 import { buildReportNotificationHtml, buildReportNotificationText } from "@/lib/email";
 
@@ -31,8 +32,8 @@ export async function blockUser(targetUserId: string) {
     if (!isDuplicateBlockError(err)) throw err;
   }
 
-  revalidatePath("/mensajes");
-  revalidatePath(`/perfil/${blockedId}`);
+  revalidatePath(routes.mensajes());
+  revalidatePath(routes.persona(blockedId));
 }
 
 /**
@@ -45,8 +46,8 @@ export async function unblockUser(targetUserId: string) {
 
   await db.block.deleteMany({ where: { blockerId: user.id, blockedId } });
 
-  revalidatePath("/mensajes");
-  revalidatePath(`/perfil/${blockedId}`);
+  revalidatePath(routes.mensajes());
+  revalidatePath(routes.persona(blockedId));
 }
 
 /**
@@ -76,7 +77,7 @@ export async function reportConversation(input: unknown) {
 
   await notifyModerators({ category: data.category, subReason: data.subReason ?? null });
 
-  revalidatePath("/admin");
+  revalidatePath(routes.admin());
   return report;
 }
 
@@ -94,7 +95,7 @@ async function notifyModerators(report: { category: string; subReason: string | 
   const resend = new Resend(apiKey);
   const from = process.env.EMAIL_FROM ?? "Moon Club <onboarding@resend.dev>";
   const baseUrl = process.env.AUTH_URL ?? "http://localhost:3000";
-  const adminUrl = `${baseUrl}/admin`;
+  const adminUrl = `${baseUrl}${routes.admin()}`;
   const subject = "Nuevo reporte recibido";
   const html = buildReportNotificationHtml({ report: { ...report, adminUrl } });
   const text = buildReportNotificationText({ report: { ...report, adminUrl } });
@@ -155,5 +156,5 @@ export async function resolveReport(id: string, status: ReportStatus) {
     data: { status, resolvedAt: new Date(), resolvedById: moderator.id },
   });
 
-  revalidatePath("/admin");
+  revalidatePath(routes.admin());
 }

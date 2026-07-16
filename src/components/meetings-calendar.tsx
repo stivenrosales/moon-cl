@@ -20,6 +20,7 @@ import { es } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RsvpButtons } from "@/components/rsvp-buttons";
+import { routes } from "@/lib/routes";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
   MEETING_TYPE_BADGE_VARIANT,
@@ -156,7 +157,7 @@ export function MeetingsCalendar({ meetings }: { meetings: CalendarMeeting[] }) 
                     <Badge variant={MEETING_TYPE_BADGE_VARIANT[m.type]}>
                       {MEETING_TYPE_LABELS[m.type]}
                     </Badge>
-                    <Link href={`/reuniones/${m.id}`} className="font-medium hover:text-primary">
+                    <Link href={routes.reunion(m.id)} className="font-medium hover:text-primary">
                       {m.title}
                     </Link>
                     <span className="ml-auto text-xs text-muted-foreground tabular-nums">

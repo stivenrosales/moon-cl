@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { suggestBookSchema } from "@/lib/validators";
 import { requireUser } from "@/server/auth-helpers";
 import { findOrCreateBook } from "@/server/services/books";
@@ -38,8 +39,8 @@ export async function suggestBook(input: unknown) {
     },
   });
 
-  revalidatePath(`/rondas/${data.roundId}`);
-  revalidatePath("/dashboard");
+  revalidatePath(routes.ronda(data.roundId));
+  revalidatePath(routes.hoy());
   return suggestion;
 }
 
@@ -58,5 +59,5 @@ export async function deleteSuggestion(id: string) {
     throw new Error("La ronda ya no está abierta");
   }
   await db.bookSuggestion.delete({ where: { id: parsedId } });
-  revalidatePath(`/rondas/${suggestion.roundId}`);
+  revalidatePath(routes.ronda(suggestion.roundId));
 }

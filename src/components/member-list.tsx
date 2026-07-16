@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FollowButton } from "@/components/follow-button";
+import { routes } from "@/lib/routes";
 import { getInitials } from "@/lib/utils";
 
 export interface MemberRow {
@@ -72,7 +73,7 @@ export function MemberList({ rows }: MemberListProps) {
         <ul className="divide-y divide-border/40 rounded-xl border border-border/40 bg-card/40">
           {filtered.map((m) => (
             <li key={m.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
-              <Link href={`/perfil/${m.id}`} className="focus-ring shrink-0 rounded-full">
+              <Link href={routes.persona(m.id)} className="focus-ring shrink-0 rounded-full">
                 <Avatar className="h-9 w-9">
                   {m.image ? <AvatarImage src={m.image} alt="" /> : null}
                   <AvatarFallback className="text-xs">{getInitials(m.name, m.email)}</AvatarFallback>
@@ -80,7 +81,7 @@ export function MemberList({ rows }: MemberListProps) {
               </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Link href={`/perfil/${m.id}`} className="focus-ring min-w-0 rounded-sm">
+                  <Link href={routes.persona(m.id)} className="focus-ring min-w-0 rounded-sm">
                     <p className="truncate text-sm font-medium hover:text-primary transition-colors">
                       {m.name ?? m.email?.split("@")[0]}
                     </p>

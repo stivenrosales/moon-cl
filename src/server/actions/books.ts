@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { searchBooks, type BookCandidate } from "@/lib/google-books";
+import { routes } from "@/lib/routes";
 import { bookInputSchema, bookUpdateSchema } from "@/lib/validators";
 import { requireUser, requireModerator } from "@/server/auth-helpers";
 
@@ -28,9 +29,9 @@ export async function updateBookAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/libros/${updated.id}`);
-  revalidatePath("/biblioteca");
-  revalidatePath("/dashboard");
+  revalidatePath(routes.libro(updated.id));
+  revalidatePath(routes.leer());
+  revalidatePath(routes.hoy());
   return updated;
 }
 

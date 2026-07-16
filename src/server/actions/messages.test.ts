@@ -112,8 +112,8 @@ describe("sendMessage", () => {
     expect(messageCreateMock).toHaveBeenCalledWith({
       data: { senderId: ME.id, receiverId: OTHER_ID, content: "hola" },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/mensajes/${OTHER_ID}`);
-    expect(revalidatePathMock).toHaveBeenCalledWith("/mensajes");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/club/mensajes/${OTHER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club/mensajes");
   });
 
   it("recorta el contenido antes de guardarlo (zod trim)", async () => {
@@ -191,7 +191,7 @@ describe("markThreadRead", () => {
       where: { senderId: OTHER_ID, receiverId: ME.id, readAt: null },
       data: { readAt: expect.any(Date) },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/mensajes/${OTHER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/club/mensajes/${OTHER_ID}`);
   });
 
   it("rechaza un id que no es un cuid válido", async () => {

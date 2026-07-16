@@ -6,6 +6,7 @@ import { Inbox, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { routes } from "@/lib/routes";
 import { cn, formatTime, getInitials } from "@/lib/utils";
 
 export interface ConversationRow {
@@ -36,7 +37,7 @@ export function ConversationList({ rows, viewerId }: ConversationListProps) {
         <p className="mt-2 hand-script text-2xl">aún no tienes conversaciones</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Encuentra lectores en{" "}
-          <Link href="/miembros" className="text-primary hover:underline">
+          <Link href={routes.club({ vista: "personas" })} className="text-primary hover:underline">
             Miembros
           </Link>
           .
@@ -70,7 +71,7 @@ export function ConversationList({ rows, viewerId }: ConversationListProps) {
             return (
               <li key={row.otherUserId}>
                 <Link
-                  href={`/mensajes/${row.otherUserId}`}
+                  href={routes.mensajeCon(row.otherUserId)}
                   className="flex items-center gap-3 px-3 py-3 sm:px-4 hover:bg-muted/40 transition-colors focus-ring"
                 >
                   <Avatar className="h-10 w-10 shrink-0">

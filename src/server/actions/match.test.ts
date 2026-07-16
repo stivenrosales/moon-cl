@@ -54,7 +54,7 @@ describe("toggleMatchOptIn", () => {
       data: { isMatchOptIn: true },
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/perfil");
-    expect(revalidatePathMock).toHaveBeenCalledWith("/comunidad");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
   });
 
   it("desactiva el Book Match cuando estaba activado", async () => {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { idSchema, meetingSchema, rsvpSchema } from "@/lib/validators";
+import { routes } from "@/lib/routes";
 import { requireAdmin, requireUser } from "@/server/auth-helpers";
 
 export async function createMeeting(input: unknown) {
@@ -24,9 +25,9 @@ export async function createMeeting(input: unknown) {
     },
   });
 
-  revalidatePath("/reuniones");
-  revalidatePath("/dashboard");
-  if (data.bookId) revalidatePath(`/libros/${data.bookId}`);
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.hoy());
+  if (data.bookId) revalidatePath(routes.libro(data.bookId));
   return meeting;
 }
 
@@ -60,8 +61,8 @@ export async function updateMeeting(id: string, input: unknown) {
     },
   });
 
-  revalidatePath("/reuniones");
-  revalidatePath(`/reuniones/${id}`);
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.reunion(id));
 }
 
 export async function deleteMeeting(id: string) {
@@ -75,9 +76,9 @@ export async function deleteMeeting(id: string) {
 
   await db.meeting.delete({ where: { id: parsedId } });
 
-  revalidatePath("/reuniones");
-  revalidatePath("/dashboard");
-  if (meeting?.bookId) revalidatePath(`/libros/${meeting.bookId}`);
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.hoy());
+  if (meeting?.bookId) revalidatePath(routes.libro(meeting.bookId));
 }
 
 export async function setRsvp(input: unknown) {
@@ -90,7 +91,7 @@ export async function setRsvp(input: unknown) {
     update: { status: data.status },
   });
 
-  revalidatePath(`/reuniones/${data.meetingId}`);
-  revalidatePath("/reuniones");
-  revalidatePath("/dashboard");
+  revalidatePath(routes.reunion(data.meetingId));
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.hoy());
 }

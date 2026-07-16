@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { requireUser } from "@/server/auth-helpers";
 
 export async function toggleVote(suggestionId: string) {
@@ -31,6 +32,6 @@ export async function toggleVote(suggestionId: string) {
     await db.vote.create({ data: { suggestionId: parsedId, userId: user.id } });
   }
 
-  revalidatePath(`/rondas/${suggestion.roundId}`);
+  revalidatePath(routes.ronda(suggestion.roundId));
   return { voted: !existing };
 }

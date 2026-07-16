@@ -10,6 +10,7 @@ import { ProfileEditDialog } from "@/components/profile-edit-dialog";
 import { ProfileStat } from "@/components/profile-stat";
 import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 import type { Role } from "@prisma/client";
 
 const roleLabel: Record<Role, string> = {
@@ -78,8 +79,16 @@ export default async function PerfilPage() {
 
       {/* Comunidad: seguidores/siguiendo, enlazan al directorio de miembros */}
       <div className="grid grid-cols-2 gap-4 max-w-sm">
-        <ProfileStat label="Seguidores" value={followCounts.followers} href="/miembros" />
-        <ProfileStat label="Siguiendo" value={followCounts.following} href="/miembros" />
+        <ProfileStat
+          label="Seguidores"
+          value={followCounts.followers}
+          href={routes.club({ vista: "personas" })}
+        />
+        <ProfileStat
+          label="Siguiendo"
+          value={followCounts.following}
+          href={routes.club({ vista: "personas" })}
+        />
       </div>
 
       {/* Botones */}
@@ -143,7 +152,7 @@ export default async function PerfilPage() {
                   <div className="flex gap-3">
                     <BookCover src={s.book.coverUrl} title={s.book.title} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <Link href={`/libros/${s.book.id}`} className="font-medium hover:text-primary">
+                      <Link href={routes.libro(s.book.id)} className="font-medium hover:text-primary">
                         {s.book.title}
                       </Link>
                       <p className="text-xs text-muted-foreground">
@@ -151,7 +160,7 @@ export default async function PerfilPage() {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Ronda{" "}
-                        <Link href={`/rondas/${s.round.id}`} className="hover:text-primary italic">
+                        <Link href={routes.ronda(s.round.id)} className="hover:text-primary italic">
                           {s.round.title}
                         </Link>{" "}
                         · {s._count.votes} voto{s._count.votes === 1 ? "" : "s"}
@@ -182,7 +191,7 @@ export default async function PerfilPage() {
                   <div className="flex gap-3">
                     <BookCover src={r.book.coverUrl} title={r.book.title} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <Link href={`/libros/${r.book.id}`} className="font-medium hover:text-primary">
+                      <Link href={routes.libro(r.book.id)} className="font-medium hover:text-primary">
                         {r.book.title}
                       </Link>
                       <div className="mt-1">

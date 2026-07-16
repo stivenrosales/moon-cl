@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { commentSchema, idSchema } from "@/lib/validators";
 import { requireUser, requireModerator } from "@/server/auth-helpers";
 import { isModeratorOrAbove } from "@/lib/permissions";
@@ -57,7 +58,7 @@ export async function postComment(input: unknown) {
     },
   });
 
-  revalidatePath(`/libros/${data.bookId}`);
+  revalidatePath(routes.libro(data.bookId));
   return comment;
 }
 
@@ -102,7 +103,7 @@ export async function deleteComment(id: string) {
     where: { id: parsedId },
     data: { deletedAt: new Date(), content: "[eliminado]" },
   });
-  revalidatePath(`/libros/${comment.bookId}`);
+  revalidatePath(routes.libro(comment.bookId));
 }
 
 export async function moderateComment(id: string, action: "delete" | "unspoiler" | "spoiler") {
@@ -122,5 +123,5 @@ export async function moderateComment(id: string, action: "delete" | "unspoiler"
       data: { isSpoiler: action === "spoiler" },
     });
   }
-  revalidatePath(`/libros/${comment.bookId}`);
+  revalidatePath(routes.libro(comment.bookId));
 }

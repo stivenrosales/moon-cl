@@ -53,6 +53,7 @@ model User {
   reportsResolved   Report[]          @relation("ReportResolver")
   matchesAsUserA    Match[]           @relation("MatchUserA")
   matchesAsUserB    Match[]           @relation("MatchUserB")
+  nudges            UserNudge[]
 }
 
 enum Role {
@@ -481,4 +482,20 @@ model Match {
 
   @@unique([userAId, userBId, weekOf])
   @@index([weekOf])
+}
+
+model UserNudge {
+  id          String    @id @default(cuid())
+  userId      String
+  key         String
+  payload     Json?
+  dismissedAt DateTime?
+  actedAt     DateTime?
+  reason      String? // 'pre-existing' para las filas del backfill
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
 }

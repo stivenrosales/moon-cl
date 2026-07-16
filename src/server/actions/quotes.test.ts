@@ -75,8 +75,8 @@ describe("createQuote", () => {
         }),
       }),
     );
-    expect(revalidatePathMock).toHaveBeenCalledWith("/comunidad");
-    expect(revalidatePathMock).toHaveBeenCalledWith("/libros/book-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/leer/libro/book-1");
   });
 
   it("lanza error si el libro no existe", async () => {
@@ -117,8 +117,8 @@ describe("deleteQuote", () => {
     await deleteQuote(VALID_CUID);
 
     expect(quoteDeleteMock).toHaveBeenCalledWith({ where: { id: VALID_CUID } });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/comunidad");
-    expect(revalidatePathMock).toHaveBeenCalledWith("/libros/book-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/leer/libro/book-1");
   });
 
   it("permite borrar a un moderador aunque no sea el autor", async () => {

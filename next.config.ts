@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
+import { getLegacyRedirects } from "./src/lib/legacy-redirects";
+
 const nextConfig: NextConfig = {
+  async redirects() {
+    return getLegacyRedirects();
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "books.google.com" },

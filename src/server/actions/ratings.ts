@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { idSchema, ratingSchema } from "@/lib/validators";
 import { requireUser } from "@/server/auth-helpers";
 
@@ -23,7 +24,7 @@ export async function upsertRating(input: unknown) {
     },
   });
 
-  revalidatePath(`/libros/${data.bookId}`);
+  revalidatePath(routes.libro(data.bookId));
   return rating;
 }
 
@@ -33,5 +34,5 @@ export async function deleteRating(bookId: string) {
   await db.rating.delete({
     where: { bookId_userId: { bookId: parsedBookId, userId: user.id } },
   });
-  revalidatePath(`/libros/${parsedBookId}`);
+  revalidatePath(routes.libro(parsedBookId));
 }

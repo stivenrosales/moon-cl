@@ -20,6 +20,7 @@ import { ReportDialog } from "@/components/report-dialog";
 import { blockUser } from "@/server/actions/moderation";
 import { sendMessage } from "@/server/actions/messages";
 import { groupMessagesByDay } from "@/lib/message-thread";
+import { routes } from "@/lib/routes";
 import { cn, formatTime, getInitials, relativeTime } from "@/lib/utils";
 
 interface ThreadUser {
@@ -151,7 +152,7 @@ export function ThreadView({
     try {
       await blockUser(otherUser.id);
       toast.success("Usuario bloqueado");
-      router.push("/mensajes");
+      router.push(routes.mensajes());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo bloquear");
     }
@@ -161,7 +162,7 @@ export function ThreadView({
     <Card className="flex h-[75dvh] max-h-[820px] min-h-[420px] flex-col overflow-hidden">
       <header className="flex shrink-0 items-center gap-3 border-b border-border/50 px-3.5 py-3 sm:px-5">
         <Link
-          href="/mensajes"
+          href={routes.mensajes()}
           aria-label="Volver a mensajes"
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-ring"
         >
@@ -280,7 +281,7 @@ export function ThreadView({
         onOpenChange={setReportOpen}
         targetUserId={otherUser.id}
         targetUserName={displayName}
-        onBlocked={() => router.push("/mensajes")}
+        onBlocked={() => router.push(routes.mensajes())}
       />
     </Card>
   );

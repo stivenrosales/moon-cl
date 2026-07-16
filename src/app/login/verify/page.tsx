@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail } from "lucide-react";
 import { MoonLogo } from "@/components/moon-logo";
 import { Button } from "@/components/ui/button";
+import { routes } from "@/lib/routes";
 
 export default function VerifyPage() {
   return (
@@ -22,7 +23,7 @@ export default function VerifyPage() {
         </div>
 
         <Button asChild variant="outline">
-          <Link href="/login">Reenviar enlace</Link>
+          <Link href={routes.login()}>Reenviar enlace</Link>
         </Button>
 
         <p className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">

@@ -137,7 +137,7 @@ describe("createKahootActivity", () => {
     ).rejects.toThrow();
   });
 
-  it("revalida /puntajes y /admin", async () => {
+  it("revalida /agenda y /admin", async () => {
     createMock.mockResolvedValue({ id: "activity-1" });
 
     await createKahootActivity({
@@ -145,7 +145,7 @@ describe("createKahootActivity", () => {
       playedAt: new Date("2026-07-01"),
     });
 
-    expect(revalidatePathMock).toHaveBeenCalledWith("/puntajes");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/agenda");
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
   });
 });
@@ -214,12 +214,12 @@ describe("deleteKahootActivity", () => {
     expect(deleteMock).toHaveBeenCalledWith({ where: { id: VALID_ID } });
   });
 
-  it("revalida /puntajes y /admin", async () => {
+  it("revalida /agenda y /admin", async () => {
     deleteMock.mockResolvedValue({ id: VALID_ID });
 
     await deleteKahootActivity(VALID_ID);
 
-    expect(revalidatePathMock).toHaveBeenCalledWith("/puntajes");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/agenda");
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin");
   });
 

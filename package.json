@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:backfill-nudges": "tsx prisma/backfill-nudges.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest"

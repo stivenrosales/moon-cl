@@ -56,7 +56,7 @@ describe("followUser", () => {
     expect(followCreateMock).not.toHaveBeenCalled();
   });
 
-  it("crea el registro Follow y revalida /miembros y los perfiles involucrados", async () => {
+  it("crea el registro Follow y revalida /club y los perfiles involucrados", async () => {
     followCreateMock.mockResolvedValue({ id: "f1", followerId: ME.id, followingId: OTHER_ID });
 
     await followUser(OTHER_ID);
@@ -64,8 +64,8 @@ describe("followUser", () => {
     expect(followCreateMock).toHaveBeenCalledWith({
       data: { followerId: ME.id, followingId: OTHER_ID },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/miembros");
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/perfil/${OTHER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/club/persona/${OTHER_ID}`);
     expect(revalidatePathMock).toHaveBeenCalledWith("/perfil");
   });
 
@@ -73,7 +73,7 @@ describe("followUser", () => {
     followCreateMock.mockRejectedValue(duplicateFollowError());
 
     await expect(followUser(OTHER_ID)).resolves.toBeUndefined();
-    expect(revalidatePathMock).toHaveBeenCalledWith("/miembros");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
   });
 
   it("relanza errores de Prisma que no son de duplicado", async () => {
@@ -108,8 +108,8 @@ describe("unfollowUser", () => {
     expect(followDeleteManyMock).toHaveBeenCalledWith({
       where: { followerId: ME.id, followingId: OTHER_ID },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/miembros");
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/perfil/${OTHER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/club/persona/${OTHER_ID}`);
     expect(revalidatePathMock).toHaveBeenCalledWith("/perfil");
   });
 });

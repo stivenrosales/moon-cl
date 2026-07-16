@@ -123,8 +123,8 @@ describe("blockUser", () => {
     expect(blockCreateMock).toHaveBeenCalledWith({
       data: { blockerId: ME.id, blockedId: OTHER_ID },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/mensajes");
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/perfil/${OTHER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club/mensajes");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/club/persona/${OTHER_ID}`);
   });
 
   it("es idempotente ante un choque con @@unique (P2002)", async () => {
@@ -160,7 +160,7 @@ describe("unblockUser", () => {
     expect(blockDeleteManyMock).toHaveBeenCalledWith({
       where: { blockerId: ME.id, blockedId: OTHER_ID },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/mensajes");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club/mensajes");
   });
 });
 

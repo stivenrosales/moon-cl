@@ -7,6 +7,7 @@ import { MoonLogo } from "@/components/moon-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label, Field } from "@/components/ui/label";
+import { routes } from "@/lib/routes";
 
 export default async function LoginPage({
   searchParams,
@@ -14,7 +15,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const session = await getSession();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect(routes.hoy());
 
   const { error } = await searchParams;
 
@@ -22,7 +23,7 @@ export default async function LoginPage({
     "use server";
     const email = String(formData.get("email") ?? "").trim();
     if (!email) return;
-    await signIn("resend", { email, redirectTo: "/dashboard" });
+    await signIn("resend", { email, redirectTo: routes.hoy() });
   }
 
   return (

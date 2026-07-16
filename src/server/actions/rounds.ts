@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { roundSchema } from "@/lib/validators";
 import { requireAdmin } from "@/server/auth-helpers";
 import { closeRoundTx } from "@/server/services/club";
@@ -27,9 +28,9 @@ export async function createRound(input: unknown) {
     },
   });
 
-  revalidatePath("/rondas");
-  revalidatePath("/admin");
-  revalidatePath("/dashboard");
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
+  revalidatePath(routes.hoy());
   return round;
 }
 
@@ -47,19 +48,19 @@ export async function updateRound(id: string, input: unknown) {
     },
   });
 
-  revalidatePath(`/rondas/${id}`);
-  revalidatePath("/rondas");
-  revalidatePath("/admin");
+  revalidatePath(routes.ronda(id));
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
 }
 
 export async function openRound(id: string) {
   await requireAdmin();
   const parsedId = z.string().cuid().parse(id);
   await db.round.update({ where: { id: parsedId }, data: { status: "OPEN" } });
-  revalidatePath(`/rondas/${parsedId}`);
-  revalidatePath("/rondas");
-  revalidatePath("/admin");
-  revalidatePath("/dashboard");
+  revalidatePath(routes.ronda(parsedId));
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
+  revalidatePath(routes.hoy());
 }
 
 /**
@@ -74,20 +75,20 @@ export async function closeRound(id: string) {
 
   const winner = await db.$transaction((tx) => closeRoundTx(tx, parsedId));
 
-  revalidatePath(`/rondas/${parsedId}`);
-  revalidatePath("/rondas");
-  revalidatePath("/admin");
-  revalidatePath("/dashboard");
-  revalidatePath("/biblioteca");
-  if (winner) revalidatePath(`/libros/${winner.bookId}`);
+  revalidatePath(routes.ronda(parsedId));
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.leer());
+  if (winner) revalidatePath(routes.libro(winner.bookId));
 }
 
 export async function deleteRound(id: string) {
   await requireAdmin();
   const parsedId = z.string().cuid().parse(id);
   await db.round.delete({ where: { id: parsedId } });
-  revalidatePath("/rondas");
-  revalidatePath("/admin");
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
 }
 
 /**
@@ -109,10 +110,10 @@ export async function chooseRoundWinner(suggestionId: string) {
     closeRoundTx(tx, suggestion.roundId, suggestion.bookId),
   );
 
-  revalidatePath(`/rondas/${suggestion.roundId}`);
-  revalidatePath("/rondas");
-  revalidatePath("/dashboard");
-  revalidatePath("/biblioteca");
-  revalidatePath(`/libros/${suggestion.bookId}`);
-  revalidatePath("/admin");
+  revalidatePath(routes.ronda(suggestion.roundId));
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.leer());
+  revalidatePath(routes.libro(suggestion.bookId));
+  revalidatePath(routes.admin());
 }

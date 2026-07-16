@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { idSchema, messageSchema } from "@/lib/validators";
 import { requireUser } from "@/server/auth-helpers";
 import {
@@ -43,8 +44,8 @@ export async function sendMessage(input: unknown) {
     },
   });
 
-  revalidatePath(`/mensajes/${data.receiverId}`);
-  revalidatePath("/mensajes");
+  revalidatePath(routes.mensajeCon(data.receiverId));
+  revalidatePath(routes.mensajes());
   return message;
 }
 
@@ -89,6 +90,6 @@ export async function markThreadRead(otherId: string) {
     data: { readAt: new Date() },
   });
 
-  revalidatePath(`/mensajes/${parsedOtherId}`);
-  revalidatePath("/mensajes");
+  revalidatePath(routes.mensajeCon(parsedOtherId));
+  revalidatePath(routes.mensajes());
 }

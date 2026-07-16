@@ -5,6 +5,7 @@ import { del } from "@vercel/blob";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { onboardingSchema, profileUpdateSchema } from "@/lib/validators";
+import { routes } from "@/lib/routes";
 import { requireUser } from "@/server/auth-helpers";
 
 // El paso 1 del onboarding también captura el nombre, pero onboardingSchema
@@ -29,8 +30,8 @@ export async function completeOnboarding(input: unknown) {
     },
   });
 
-  revalidatePath("/dashboard");
-  revalidatePath("/perfil");
+  revalidatePath(routes.hoy());
+  revalidatePath(routes.perfil());
 }
 
 export async function updateProfile(input: unknown) {
@@ -47,7 +48,7 @@ export async function updateProfile(input: unknown) {
     },
   });
 
-  revalidatePath("/perfil");
+  revalidatePath(routes.perfil());
 }
 
 export async function setAvatar(url: string) {
@@ -74,6 +75,6 @@ export async function setAvatar(url: string) {
     }
   }
 
-  revalidatePath("/perfil");
+  revalidatePath(routes.perfil());
   return parsedUrl;
 }

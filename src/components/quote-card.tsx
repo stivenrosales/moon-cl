@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BookCover } from "@/components/book-cover";
 import { toggleQuoteLike, deleteQuote } from "@/server/actions/quotes";
+import { routes } from "@/lib/routes";
 import { cn, getInitials, relativeTime } from "@/lib/utils";
 
 export interface QuoteCardData {
@@ -79,12 +80,12 @@ export function QuoteCard({ quote, currentUserId, isModerator }: QuoteCardProps)
       </p>
 
       <div className="flex items-center gap-2.5 min-w-0">
-        <Link href={`/libros/${quote.book.id}`} className="shrink-0 focus-ring rounded-md">
+        <Link href={routes.libro(quote.book.id)} className="shrink-0 focus-ring rounded-md">
           <BookCover src={quote.book.coverUrl} title={quote.book.title} size="sm" />
         </Link>
         <div className="min-w-0 flex-1">
           <Link
-            href={`/libros/${quote.book.id}`}
+            href={routes.libro(quote.book.id)}
             className="text-sm font-medium leading-snug hover:text-primary transition-colors line-clamp-1"
           >
             {quote.book.title}

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { requireUser } from "@/server/auth-helpers";
 
 /**
@@ -26,8 +27,8 @@ export async function toggleMatchOptIn() {
     data: { isMatchOptIn },
   });
 
-  revalidatePath("/perfil");
-  revalidatePath("/comunidad");
+  revalidatePath(routes.perfil());
+  revalidatePath(routes.club());
 
   return { isMatchOptIn };
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, BookOpen, Vote, Library, BookMarked, CalendarDays, Users, MessagesSquare, Trophy, User2, Shield, Home, Mail } from "lucide-react";
+import { LogOut, User2, Shield, Home, Mail } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { MoonLogo } from "@/components/moon-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -16,6 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getBottomTabItems, isBottomTabActive } from "@/lib/bottom-tabs";
+import { routes } from "@/lib/routes";
 import { cn, getInitials } from "@/lib/utils";
 import type { Role } from "@prisma/client";
 
@@ -30,54 +32,86 @@ interface NavProps {
   unreadCount?: number;
 }
 
-const links = [
-  { href: "/dashboard", label: "Inicio", icon: BookOpen },
-  { href: "/rondas", label: "Votación", icon: Vote },
-  { href: "/biblioteca", label: "Biblioteca", icon: Library },
-  { href: "/mi-biblioteca", label: "Mi biblioteca", icon: BookMarked },
-  { href: "/comunidad", label: "Comunidad", icon: MessagesSquare },
-  { href: "/miembros", label: "Miembros", icon: Users },
-  { href: "/reuniones", label: "Reuniones", icon: CalendarDays },
-  { href: "/puntajes", label: "Puntajes", icon: Trophy },
-];
+/**
+ * Los 4 destinos de escritorio son los mismos 4 primeros tabs de
+ * BottomTabBar (src/lib/bottom-tabs.ts): una sola fuente de verdad para
+ * "qué destinos existen" y "cuándo está activo uno", sin duplicar la
+ * tabla. El 5º tab ("perfil") lo excluimos acá porque en escritorio no es
+ * un link con icono: es el avatar con dropdown de la derecha.
+ */
+const desktopDestinations = getBottomTabItems().filter((tab) => tab.key !== "perfil");
 
 export function Nav({ user, unreadCount = 0 }: NavProps) {
   const pathname = usePathname();
   const isAdmin = user.role === "ADMIN" || user.role === "MODERATOR";
   const inAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  const mensajesActive = isBottomTabActive(pathname, routes.mensajes());
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="container flex h-16 items-center gap-6">
+      {/* Header móvil: 48px, solo logo + mensajes. El theme-toggle vive en
+          /perfil y la navegación la da BottomTabBar (ver (app)/layout.tsx). */}
+      <div className="flex h-12 items-center justify-between px-4 md:hidden">
         <Link
-          href="/dashboard"
-          className="flex items-center gap-3 focus-ring rounded-md py-1"
+          href={routes.hoy()}
+          className="flex items-center gap-2 rounded-md py-1 focus-ring"
+          aria-label="Inicio Moon Club de Lectura"
+        >
+          <MoonLogo size={28} className="shrink-0" />
+          <span className="hand-script text-xl text-foreground">Moon</span>
+        </Link>
+
+        <Link
+          href={routes.mensajes()}
+          aria-label={unreadCount > 0 ? `Mensajes, ${unreadCount} sin leer` : "Mensajes"}
+          className={cn(
+            "relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-ring",
+            mensajesActive
+              ? "bg-primary/15 text-foreground"
+              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+          )}
+        >
+          <Mail className="h-5 w-5" />
+          {unreadCount > 0 ? (
+            <span
+              aria-hidden
+              className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-background"
+            />
+          ) : null}
+        </Link>
+      </div>
+
+      {/* Header de escritorio: logo + 4 destinos + mensajes/theme/avatar. */}
+      <div className="container hidden h-16 items-center gap-6 md:flex">
+        <Link
+          href={routes.hoy()}
+          className="flex items-center gap-3 rounded-md py-1 focus-ring"
           aria-label="Inicio Moon Club de Lectura"
         >
           <MoonLogo size={36} className="shrink-0" />
-          <div className="hidden sm:flex flex-col leading-none">
+          <div className="hidden flex-col leading-none sm:flex">
             <span className="hand-script text-2xl text-foreground">Moon</span>
-            <span className="text-[9px] uppercase tracking-[0.32em] text-muted-foreground -mt-0.5">
+            <span className="-mt-0.5 text-[9px] uppercase tracking-[0.32em] text-muted-foreground">
               Club de Lectura
             </span>
           </div>
         </Link>
 
-        <nav className="ml-4 hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
-          {links.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
+        <nav className="ml-4 flex items-center gap-1">
+          {desktopDestinations.map(({ key, href, label, icon: Icon }) => {
+            const active = isBottomTabActive(pathname, href);
             return (
               <Link
-                key={href}
+                key={key}
                 href={href}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors focus-ring",
+                  "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm transition-colors focus-ring",
                   active
                     ? "bg-primary/15 text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                {Icon ? <Icon className="h-4 w-4" /> : null}
                 {label}
               </Link>
             );
@@ -86,11 +120,11 @@ export function Nav({ user, unreadCount = 0 }: NavProps) {
 
         <div className="ml-auto flex items-center gap-2">
           <Link
-            href="/mensajes"
+            href={routes.mensajes()}
             aria-label={unreadCount > 0 ? `Mensajes, ${unreadCount} sin leer` : "Mensajes"}
             className={cn(
               "relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-ring",
-              pathname === "/mensajes" || pathname.startsWith("/mensajes/")
+              mensajesActive
                 ? "bg-primary/15 text-foreground"
                 : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
             )}
@@ -122,16 +156,22 @@ export function Nav({ user, unreadCount = 0 }: NavProps) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/perfil"><User2 className="h-4 w-4" /> Mi perfil</Link>
+                <Link href={routes.perfil()}>
+                  <User2 className="h-4 w-4" /> Mi perfil
+                </Link>
               </DropdownMenuItem>
               {isAdmin ? (
                 inAdmin ? (
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard"><Home className="h-4 w-4" /> Vista normal</Link>
+                    <Link href={routes.hoy()}>
+                      <Home className="h-4 w-4" /> Vista normal
+                    </Link>
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
-                    <Link href="/admin"><Shield className="h-4 w-4" /> Panel admin</Link>
+                    <Link href={routes.admin()}>
+                      <Shield className="h-4 w-4" /> Panel admin
+                    </Link>
                   </DropdownMenuItem>
                 )
               ) : null}
@@ -143,28 +183,6 @@ export function Nav({ user, unreadCount = 0 }: NavProps) {
           </DropdownMenu>
         </div>
       </div>
-
-      {/* Mobile nav */}
-      <nav className="container -mt-1 flex md:hidden items-center gap-1.5 overflow-x-auto scrollbar-hide pb-2">
-        {links.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs transition-colors",
-                active
-                  ? "border-primary/50 bg-primary/15 text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
 }

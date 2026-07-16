@@ -9,6 +9,7 @@ import { BookCover } from "@/components/book-cover";
 import { VoteButton } from "@/components/vote-button";
 import { ChooseWinnerButton } from "@/components/admin/choose-winner-button";
 import { DeleteSuggestionButton } from "@/components/delete-suggestion-button";
+import { routes } from "@/lib/routes";
 import { cn, getInitials } from "@/lib/utils";
 
 export interface SuggestionRow {
@@ -114,7 +115,7 @@ export function RoundSuggestionsList({
                   </span>
 
                   <Link
-                    href={`/libros/${s.book.id}`}
+                    href={routes.libro(s.book.id)}
                     className="shrink-0 focus-ring rounded-md"
                     aria-label={`Ver ${s.book.title}`}
                   >
@@ -124,7 +125,7 @@ export function RoundSuggestionsList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 min-w-0">
                       <Link
-                        href={`/libros/${s.book.id}`}
+                        href={routes.libro(s.book.id)}
                         className="display text-base sm:text-lg leading-tight hover:text-primary transition-colors line-clamp-2 sm:line-clamp-1"
                       >
                         {s.book.title}

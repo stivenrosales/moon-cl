@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { routes } from "@/lib/routes";
 import { getInitials } from "@/lib/utils";
 import { toggleMatchOptIn } from "@/server/actions/match";
 
@@ -95,7 +96,7 @@ export function MatchCard({ isOptedIn: initialOptedIn, match }: MatchCardProps) 
         </div>
 
         <Button asChild size="sm" className="w-full sm:w-auto">
-          <Link href={`/mensajes/${match.otherUserId}`}>Saludar a {name}</Link>
+          <Link href={routes.mensajeCon(match.otherUserId)}>Saludar a {name}</Link>
         </Button>
       </Card>
     );

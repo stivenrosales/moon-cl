@@ -25,6 +25,7 @@ import { Field, Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { BookCover } from "@/components/book-cover";
 import { moveShelf, removeFromShelf, updateMyBook } from "@/server/actions/shelves";
+import { routes } from "@/lib/routes";
 import { pageProgress } from "@/lib/utils";
 
 export interface ShelfBookRowData {
@@ -126,7 +127,7 @@ export function ShelfBookRow({ item, variant = "row" }: ShelfBookRowProps) {
     return (
       <div className="w-28 shrink-0 space-y-2">
         <div className="relative">
-          <Link href={`/libros/${item.bookId}`} className="focus-ring block rounded-md">
+          <Link href={routes.libro(item.bookId)} className="focus-ring block rounded-md">
             <BookCover
               src={item.book.coverUrl}
               title={item.book.title}
@@ -174,11 +175,11 @@ export function ShelfBookRow({ item, variant = "row" }: ShelfBookRowProps) {
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border/40 bg-card/40 p-2.5 sm:p-3">
-      <Link href={`/libros/${item.bookId}`} className="focus-ring shrink-0 rounded-md">
+      <Link href={routes.libro(item.bookId)} className="focus-ring shrink-0 rounded-md">
         <BookCover src={item.book.coverUrl} title={item.book.title} size="sm" />
       </Link>
       <div className="min-w-0 flex-1">
-        <Link href={`/libros/${item.bookId}`} className="focus-ring rounded-sm">
+        <Link href={routes.libro(item.bookId)} className="focus-ring rounded-sm">
           <p className="line-clamp-1 font-medium leading-snug hover:text-primary transition-colors">
             {item.book.title}
           </p>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { routes } from "@/lib/routes";
 import { idSchema } from "@/lib/validators";
 import { requireUser } from "@/server/auth-helpers";
 
@@ -11,9 +12,9 @@ function isDuplicateFollowError(err: unknown): boolean {
 }
 
 function revalidateFollowPaths(targetUserId: string) {
-  revalidatePath("/miembros");
-  revalidatePath(`/perfil/${targetUserId}`);
-  revalidatePath("/perfil");
+  revalidatePath(routes.club());
+  revalidatePath(routes.persona(targetUserId));
+  revalidatePath(routes.perfil());
 }
 
 /**

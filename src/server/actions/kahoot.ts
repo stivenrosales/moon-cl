@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { idSchema, kahootActivitySchema, kahootScoresSchema } from "@/lib/validators";
+import { routes } from "@/lib/routes";
 import { requireAdmin, requireModerator } from "@/server/auth-helpers";
 
 // Un solo puntaje suelto del roster de kahootScoresSchema: se reutiliza acá
@@ -53,8 +54,8 @@ export async function createKahootActivity(input: unknown) {
     return created;
   });
 
-  revalidatePath("/puntajes");
-  revalidatePath("/admin");
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
   return activity;
 }
 
@@ -84,14 +85,14 @@ export async function updateKahootScore(activityId: string, input: unknown) {
     },
   });
 
-  revalidatePath("/puntajes");
-  revalidatePath("/admin");
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
 }
 
 export async function deleteKahootActivity(id: string) {
   await requireAdmin();
   const parsedId = idSchema.parse(id);
   await db.kahootActivity.delete({ where: { id: parsedId } });
-  revalidatePath("/puntajes");
-  revalidatePath("/admin");
+  revalidatePath(routes.agenda());
+  revalidatePath(routes.admin());
 }

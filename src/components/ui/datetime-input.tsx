@@ -14,7 +14,9 @@ const DateTimeInput = React.forwardRef<HTMLInputElement, Omit<InputProps, "type"
   ({ className, value, ...props }, ref) => {
     const isEmpty = !value;
     return (
-      <div className="relative">
+      // min-w-0: idem select.tsx — un datetime-local nativo tiene un ancho
+      // intrínseco propio que no debe imponerse por encima del contenedor.
+      <div className="relative min-w-0 w-full">
         <Calendar
           aria-hidden
           className={cn(

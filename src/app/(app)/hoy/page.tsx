@@ -43,12 +43,40 @@ export default async function HoyPage() {
   const isModerator = isModeratorOrAbove(session.user.role);
   const now = new Date();
 
-  const [hero, urgency, feedEntries, nudge] = await Promise.all([
-    loadToday(userId),
-    loadUrgency(userId, db, now),
-    loadFeed(userId),
-    nextNudge(userId, db, now),
-  ]);
+  const sevenDaysAgo = new Date(now.getTime() - SEMANA_MS);
+
+  // weeklyQuotesRaw/upcomingMeetings/activeRounds no dependen de nada del
+  // resto de la página: antes esperaban a que loadToday/loadUrgency/etc.
+  // terminaran para recién dispararse en un segundo Promise.all — un
+  // round-trip evitable. Ahora corren en el mismo batch inicial.
+  const [hero, urgency, feedEntries, nudge, weeklyQuotesRaw, upcomingMeetings, activeRounds] =
+    await Promise.all([
+      loadToday(userId),
+      loadUrgency(userId, db, now),
+      loadFeed(userId),
+      nextNudge(userId, db, now),
+      db.quote.findMany({
+        where: { createdAt: { gte: sevenDaysAgo } },
+        include: {
+          user: { select: { id: true, name: true, email: true, image: true } },
+          book: { select: { id: true, title: true, coverUrl: true } },
+          likes: { select: { userId: true } },
+          _count: { select: { likes: true } },
+        },
+      }),
+      db.meeting.findMany({
+        where: { startsAt: { gte: now } },
+        orderBy: { startsAt: "asc" },
+        take: 5,
+        select: { id: true, title: true, startsAt: true },
+      }),
+      db.round.findMany({
+        where: { status: { in: ["OPEN", "SCHEDULED"] } },
+        orderBy: { startsAt: "asc" },
+        take: 5,
+        select: { id: true, title: true, startsAt: true, endsAt: true, status: true },
+      }),
+    ]);
 
   // "bienvenida" pinta como card propia bajo la héroe; "sugerir" es inline
   // (inline: true) y se pasa a la card de votación de abajo — no gasta slot.
@@ -57,13 +85,12 @@ export default async function HoyPage() {
   const libroActual = hero.estado !== "sin-libro" ? hero.libro : null;
 
   // Los slots de la fila de urgencia solo traen id + deadline (buildUrgency
-  // es puro): acá se resuelve el título/estado real para pintarlos.
+  // es puro): acá se resuelve el título/estado real para pintarlos. Estas sí
+  // dependen de urgency (batch anterior), por eso quedan en un segundo batch.
   const roundIds = urgency.slots.flatMap((s) => (s.tipo === "ronda" ? [s.id] : []));
   const meetingIds = urgency.slots.flatMap((s) => (s.tipo === "reunion" ? [s.id] : []));
 
-  const sevenDaysAgo = new Date(now.getTime() - SEMANA_MS);
-
-  const [rounds, meetings, weeklyQuotesRaw, upcomingMeetings, activeRounds] = await Promise.all([
+  const [rounds, meetings] = await Promise.all([
     roundIds.length
       ? db.round.findMany({ where: { id: { in: roundIds } }, select: { id: true, title: true } })
       : Promise.resolve([]),
@@ -77,27 +104,6 @@ export default async function HoyPage() {
           },
         })
       : Promise.resolve([]),
-    db.quote.findMany({
-      where: { createdAt: { gte: sevenDaysAgo } },
-      include: {
-        user: { select: { id: true, name: true, email: true, image: true } },
-        book: { select: { id: true, title: true, coverUrl: true } },
-        likes: { select: { userId: true } },
-        _count: { select: { likes: true } },
-      },
-    }),
-    db.meeting.findMany({
-      where: { startsAt: { gte: now } },
-      orderBy: { startsAt: "asc" },
-      take: 5,
-      select: { id: true, title: true, startsAt: true },
-    }),
-    db.round.findMany({
-      where: { status: { in: ["OPEN", "SCHEDULED"] } },
-      orderBy: { startsAt: "asc" },
-      take: 5,
-      select: { id: true, title: true, startsAt: true, endsAt: true, status: true },
-    }),
   ]);
 
   const roundMap = new Map(rounds.map((r) => [r.id, r]));

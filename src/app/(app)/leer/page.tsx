@@ -36,30 +36,11 @@ export default async function LeerPage({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-[0.32em] text-accent-text">
-            {vista === "club" ? "Memoria del club" : "Tu espacio personal"}
-          </span>
-          <h1 className="display text-3xl md:text-4xl leading-[1.05] tracking-tight mt-1.5">
-            {vista === "club" ? (
-              <>
-                La <span className="hand-script italic text-primary">biblioteca</span>
-              </>
-            ) : (
-              <>
-                Mi <span className="hand-script italic text-primary">biblioteca</span>
-              </>
-            )}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            {vista === "club"
-              ? "Todos los libros que han pasado, pasan o pasarán por nuestra mesa."
-              : "Lo que estás leyendo, lo que quieres leer y lo que ya terminaste."}
-          </p>
+      {vista !== "club" ? (
+        <div className="flex justify-end">
+          <AddToShelfDialog />
         </div>
-        {vista !== "club" ? <AddToShelfDialog /> : null}
-      </header>
+      ) : null}
 
       <SegmentedControl segmentos={SEGMENTOS} activo={vista ?? "mios"} />
 
@@ -73,13 +54,21 @@ async function MiBibliotecaView() {
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
-  const [userBooks, currentClubBook, nudge] = await Promise.all([
+  // myClubProgress se resuelve vía la relación book.isCurrent en vez de
+  // esperar a currentClubBook.id: antes esto era secuencial (buscar el
+  // libro actual del club, y RECIÉN con su id pedir el progreso), acá las
+  // 4 queries corren juntas en el mismo round-trip.
+  const [userBooks, currentClubBook, myClubProgress, nudge] = await Promise.all([
     db.userBook.findMany({
       where: { userId },
       include: { book: true },
       orderBy: { updatedAt: "desc" },
     }),
     db.book.findFirst({ where: { isCurrent: true } }),
+    db.readingProgress.findFirst({
+      where: { userId, book: { isCurrent: true } },
+      orderBy: { createdAt: "desc" },
+    }),
     nextNudge(userId),
   ]);
 
@@ -89,13 +78,6 @@ async function MiBibliotecaView() {
   const firstFinishedBook = userBooks
     .filter((ub): ub is typeof ub & { finishedAt: Date } => ub.status === "FINISHED" && ub.finishedAt != null)
     .sort((a, b) => a.finishedAt.getTime() - b.finishedAt.getTime())[0] ?? null;
-
-  const myClubProgress = currentClubBook
-    ? await db.readingProgress.findFirst({
-        where: { userId, bookId: currentClubBook.id },
-        orderBy: { createdAt: "desc" },
-      })
-    : null;
 
   const clubBookId = currentClubBook?.id;
   const showClubRow = !!currentClubBook;
@@ -193,7 +175,13 @@ async function MiBibliotecaView() {
 async function BibliotecaClubView() {
   const books = await db.book.findMany({
     orderBy: [{ isCurrent: "desc" }, { finishedAt: "desc" }, { createdAt: "desc" }],
-    include: {
+    select: {
+      id: true,
+      title: true,
+      authors: true,
+      coverUrl: true,
+      isCurrent: true,
+      status: true,
       ratings: { select: { stars: true } },
       _count: { select: { comments: true, ratings: true } },
     },

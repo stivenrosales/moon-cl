@@ -27,7 +27,21 @@ export default async function PerfilPage() {
   const userId = session.user.id;
 
   const [user, suggestions, votes, ratings, comments, followCounts] = await Promise.all([
-    db.user.findUnique({ where: { id: userId } }),
+    db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        createdAt: true,
+        bio: true,
+        birthday: true,
+        favoriteGenres: true,
+        isMatchOptIn: true,
+      },
+    }),
     db.bookSuggestion.findMany({
       where: { userId },
       include: { book: true, round: true, _count: { select: { votes: true } } },

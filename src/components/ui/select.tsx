@@ -11,7 +11,10 @@ export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
     return (
-      <div className="relative">
+      // min-w-0: si este componente es hijo directo de un grid/flex (p. ej.
+      // día/mes en 2 columnas), el ancho intrínseco de las <option> no debe
+      // forzar la pista a crecer más que el contenedor del diálogo.
+      <div className="relative min-w-0 w-full">
         <select
           ref={ref}
           className={cn(

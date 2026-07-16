@@ -76,7 +76,10 @@ export function NewMeetingForm({ books }: { books: BookOption[] }) {
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field>
+        {/* min-w-0: Field es el hijo directo del grid; sin esto, el ancho
+            intrínseco del datetime-local nativo fuerza la columna a
+            desbordar el diálogo en 390px. */}
+        <Field className="min-w-0">
           <Label htmlFor="m-startsAt" required>Inicio</Label>
           <DateTimeInput
             id="m-startsAt"
@@ -86,7 +89,7 @@ export function NewMeetingForm({ books }: { books: BookOption[] }) {
             onChange={(e) => setStartsAt(e.target.value)}
           />
         </Field>
-        <Field>
+        <Field className="min-w-0">
           <Label htmlFor="m-endsAt" optional>Fin</Label>
           <DateTimeInput
             id="m-endsAt"

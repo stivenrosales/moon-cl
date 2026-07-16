@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   computeAffinity,
+  countBooksInCommon,
   getAffinity,
   labelForScore,
   loadAffinityData,
@@ -208,5 +209,32 @@ describe("getAffinity", () => {
     expect(result).not.toBeNull();
     expect(result?.evidence.librosEnComun).toBe(1);
     expect(result?.evidence.generosEnComun).toEqual(["Novela"]);
+  });
+});
+
+describe("countBooksInCommon", () => {
+  it("cuenta la intersección de dos sets de bookIds ya cargados", () => {
+    const mine = new Set(["b1", "b2", "b3"]);
+    const theirs = new Set(["b2", "b3", "b4"]);
+
+    expect(countBooksInCommon(mine, theirs)).toBe(2);
+  });
+
+  it("retorna 0 cuando ninguno de los sets es vacío pero no comparten libros", () => {
+    expect(countBooksInCommon(new Set(["b1"]), new Set(["b2"]))).toBe(0);
+  });
+
+  it("retorna 0 cuando alguno de los dos sets está vacío", () => {
+    expect(countBooksInCommon(new Set(), new Set(["b1"]))).toBe(0);
+    expect(countBooksInCommon(new Set(["b1"]), new Set())).toBe(0);
+  });
+
+  it("da el mismo resultado que booksInCommon() para los mismos bookIds — misma semántica, sin queries", () => {
+    // Reproduce el caso ya cubierto en social.test.ts (userA: {b1,b2,b3} · userB: {b1,b2,b4} → 2)
+    // pero a partir de sets ya cargados en memoria, como los que produce loadAffinityData().
+    const userA = new Set(["b1", "b2", "b3"]);
+    const userB = new Set(["b1", "b2", "b4"]);
+
+    expect(countBooksInCommon(userA, userB)).toBe(2);
   });
 });

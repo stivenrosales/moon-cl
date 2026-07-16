@@ -36,7 +36,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-1.5rem)] max-w-lg max-h-[calc(100dvh-3rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md p-5 sm:p-6 shadow-2xl",
+        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md p-5 sm:p-6 shadow-2xl [&>*]:min-w-0",
+        // En móvil reservamos la bottom tab bar (56px + safe-area) para que el
+        // último campo no quede inalcanzable debajo de ella. En md+ no existe
+        // esa barra, así que la variable se anula y el cálculo queda igual que
+        // antes. Se expresa como custom property (en vez de un `md:max-h-*`
+        // aparte) para que un consumidor que pise `max-h-*` con su propio
+        // valor (p. ej. book-edit-dialog) lo reemplace por completo, en vez
+        // de quedar mezclado con un `md:max-h-*` residual de este archivo.
+        "[--dlg-bottom-reserve:calc(56px+env(safe-area-inset-bottom))] md:[--dlg-bottom-reserve:0px]",
+        "max-h-[calc(100dvh_-_3rem_-_var(--dlg-bottom-reserve))]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
@@ -57,7 +66,9 @@ const DialogHeader = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col gap-1.5 text-left", className)} {...props} />
+  // pr-8 reserva el carril del botón de cerrar (right-4 + su propio ancho)
+  // para que el título nunca lo pise, línea por línea, incluso envuelto.
+  <div className={cn("flex flex-col gap-1.5 text-left pr-8", className)} {...props} />
 );
 
 const DialogFooter = ({
@@ -73,7 +84,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("display text-2xl leading-tight tracking-tight", className)}
+    className={cn("display text-2xl leading-tight tracking-tight break-words", className)}
     {...props}
   />
 ));

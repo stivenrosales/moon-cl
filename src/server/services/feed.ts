@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getCurrentClubBook } from "@/server/services/books";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Feed de comunidad — agregación ON-READ (a esta escala no hay Redis).
@@ -157,7 +158,7 @@ const bookSelect = { select: { id: true, title: true, coverUrl: true } } as cons
 export async function loadFeed(viewerId: string): Promise<FeedEntry[]> {
   const [followRows, clubBook] = await Promise.all([
     db.follow.findMany({ where: { followerId: viewerId }, select: { followingId: true } }),
-    db.book.findFirst({ where: { isCurrent: true }, select: { id: true } }),
+    getCurrentClubBook(),
   ]);
 
   const followingIds = followRows.map((f) => f.followingId);

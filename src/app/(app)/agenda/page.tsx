@@ -42,27 +42,6 @@ export default async function AgendaPage({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">
-          {vista === "votaciones" ? "El club elige" : vista === "trivia" ? "Trivias del club" : "El club se reúne"}
-        </span>
-        <h1 className="display text-3xl md:text-4xl leading-[1.05] tracking-tight mt-1.5">
-          {vista === "votaciones" ? (
-            <>
-              Rondas de <span className="hand-script italic text-primary">votación</span>
-            </>
-          ) : vista === "trivia" ? (
-            <>
-              <span className="hand-script italic text-primary">Puntajes</span> de Kahoot
-            </>
-          ) : (
-            <>
-              Reuniones <span className="hand-script italic text-primary">del club</span>
-            </>
-          )}
-        </h1>
-      </header>
-
       <SegmentedControl segmentos={SEGMENTOS} activo={vista} />
 
       {vista === "votaciones" ? (

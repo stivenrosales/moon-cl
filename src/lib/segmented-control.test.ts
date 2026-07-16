@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { resolverSegmentoActivo } from "./segmented-control";
+import { alineacionSegmento, resolverSegmentoActivo } from "./segmented-control";
 
 describe("resolverSegmentoActivo", () => {
   const dosSegmentos = [
@@ -39,5 +39,21 @@ describe("resolverSegmentoActivo", () => {
 
   it("es sensible a mayúsculas: no normaliza el valor recibido", () => {
     expect(resolverSegmentoActivo(dosSegmentos, "Club")).toBe("mios");
+  });
+});
+
+describe("alineacionSegmento", () => {
+  it("alinea el primer segmento a la izquierda (start)", () => {
+    expect(alineacionSegmento(0, 2)).toBe("start");
+    expect(alineacionSegmento(0, 3)).toBe("start");
+  });
+
+  it("alinea el último segmento a la derecha (end)", () => {
+    expect(alineacionSegmento(1, 2)).toBe("end");
+    expect(alineacionSegmento(2, 3)).toBe("end");
+  });
+
+  it("centra los segmentos intermedios de una tupla de 3", () => {
+    expect(alineacionSegmento(1, 3)).toBe("center");
   });
 });

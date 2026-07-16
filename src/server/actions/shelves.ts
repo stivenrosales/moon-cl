@@ -101,7 +101,7 @@ export async function startReading(bookId: string) {
   const user = await requireUser();
   const parsedBookId = idSchema.parse(bookId);
 
-  const book = await db.book.findUnique({ where: { id: parsedBookId } });
+  const book = await db.book.findUnique({ where: { id: parsedBookId }, select: { id: true } });
   if (!book) throw new Error("Libro no encontrado");
 
   const existing = await db.userBook.findUnique({

@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { loadFeed } from "@/server/services/feed";
 import { computeAffinity, labelForScore, loadAffinityData } from "@/server/services/affinity";
-import { booksInCommon } from "@/server/services/social";
 import { currentMatchWeekOf } from "@/server/jobs/book-match";
 import { MatchCard, type MatchCardMatch } from "@/components/match-card";
 import { MemberList, type MemberRow } from "@/components/member-list";
@@ -35,26 +34,6 @@ export default async function ClubPage({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">
-          {vista === "personas" ? "El club" : "La conversación"}
-        </span>
-        <h1 className="display text-3xl md:text-4xl leading-[1.05] tracking-tight mt-1.5">
-          {vista === "personas" ? (
-            <span className="hand-script italic text-primary">Miembros</span>
-          ) : (
-            <>
-              La <span className="hand-script italic text-primary">comunidad</span>
-            </>
-          )}
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          {vista === "personas"
-            ? "Encuentra a quienes leen contigo bajo la misma luna."
-            : "Lo que leen, califican y subrayan las personas que sigues — y todo el club."}
-        </p>
-      </header>
-
       <SegmentedControl segmentos={SEGMENTOS} activo={vista} />
 
       {vista === "personas" ? (
@@ -222,14 +201,18 @@ async function PersonasView() {
   if (!session?.user?.id) return null;
   const userId = session.user.id;
 
-  const nudge = await nextNudge(userId);
+  // nextNudge y el directorio de usuarios no dependen entre sí: se disparan
+  // juntos en vez de esperar uno detrás del otro. Solo primerMensajeContext
+  // depende del resultado del nudge, así que ese sí queda secuencial.
+  const [nudge, users] = await Promise.all([
+    nextNudge(userId),
+    db.user.findMany({
+      where: { id: { not: userId } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
   const clubPersonasNudge = nudge && nudge.screen === "club-personas" ? nudge : null;
   const primerMensajeContext = clubPersonasNudge ? await resolvePrimerMensajeContext(userId) : null;
-
-  const users = await db.user.findMany({
-    where: { id: { not: userId } },
-    orderBy: { name: "asc" },
-  });
 
   const [myFollowing, readingRows, affinityData] = await Promise.all([
     db.follow.findMany({ where: { followerId: userId }, select: { followingId: true } }),
@@ -253,31 +236,39 @@ async function PersonasView() {
 
   const weekAgo = new Date(Date.now() - WEEK_MS);
 
-  const rows: MemberRow[] = await Promise.all(
-    users.map(async (u) => {
-      const memberAffinityData = affinityData.get(u.id);
-      const affinity =
-        viewerAffinityData && memberAffinityData ? computeAffinity(viewerAffinityData, memberAffinityData) : null;
-      // Contrato visual: la insignia "Muy afín" solo aparece con score alto
-      // Y evidencia real detrás — nunca con datos vacíos.
-      const veryAffine =
-        !!affinity &&
-        affinity.score >= 70 &&
-        (affinity.evidence.librosEnComun > 0 || affinity.evidence.generosEnComun.length > 0);
+  // affinityData ya trae bookIds (estantería + valoraciones fusionadas, el
+  // mismo criterio que booksInCommon en services/social.ts) para TODO el
+  // directorio en 3 queries totales. Antes esta fila llamaba a
+  // booksInCommon(userId, u.id) dentro del map: eso disparaba 4 queries por
+  // miembro (y siempre volvía a pedir la estantería del propio viewer, que
+  // no cambia entre iteraciones) — un N+1 real. El cruce ahora es en
+  // memoria contra el Set ya cargado, cero queries adicionales.
+  const rows: MemberRow[] = users.map((u) => {
+    const memberAffinityData = affinityData.get(u.id);
+    const affinity =
+      viewerAffinityData && memberAffinityData ? computeAffinity(viewerAffinityData, memberAffinityData) : null;
+    // Contrato visual: la insignia "Muy afín" solo aparece con score alto
+    // Y evidencia real detrás — nunca con datos vacíos.
+    const veryAffine =
+      !!affinity &&
+      affinity.score >= 70 &&
+      (affinity.evidence.librosEnComun > 0 || affinity.evidence.generosEnComun.length > 0);
 
-      return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        image: u.image,
-        isFollowing: followingSet.has(u.id),
-        booksInCommon: await booksInCommon(userId, u.id),
-        readingTitle: readingByUser.get(u.id) ?? null,
-        isNew: u.createdAt >= weekAgo,
-        veryAffine,
-      };
-    }),
-  );
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      isFollowing: followingSet.has(u.id),
+      booksInCommon:
+        viewerAffinityData && memberAffinityData
+          ? countIntersection(viewerAffinityData.bookIds, memberAffinityData.bookIds)
+          : 0,
+      readingTitle: readingByUser.get(u.id) ?? null,
+      isNew: u.createdAt >= weekAgo,
+      veryAffine,
+    };
+  });
 
   return (
     <div className="space-y-4">
@@ -287,6 +278,15 @@ async function PersonasView() {
       <MemberList rows={rows} />
     </div>
   );
+}
+
+/** Cantidad de elementos que dos Sets comparten — cruce en memoria, sin queries. */
+function countIntersection(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  let count = 0;
+  for (const id of a) {
+    if (b.has(id)) count++;
+  }
+  return count;
 }
 
 function dedupeById<T extends { id: string }>(items: T[]): T[] {

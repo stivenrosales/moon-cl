@@ -1,5 +1,6 @@
 import type { ShelfStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { getCurrentClubBook } from "@/server/services/books";
 import { pageProgress } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ export async function loadToday(userId: string): Promise<TodayHero> {
       orderBy: { createdAt: "desc" },
       select: { book: { select: bookSelect } },
     }),
-    db.book.findFirst({ where: { isCurrent: true }, select: bookSelect }),
+    getCurrentClubBook(),
     db.userBook.findFirst({
       where: { userId, status: "READING" },
       orderBy: { updatedAt: "desc" },

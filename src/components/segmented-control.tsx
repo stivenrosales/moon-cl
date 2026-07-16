@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { resolverSegmentoActivo, type Segmentos } from "@/lib/segmented-control";
+import { alineacionSegmento, resolverSegmentoActivo, type Segmentos } from "@/lib/segmented-control";
 
 export type { Segmento, Segmentos } from "@/lib/segmented-control";
 export { resolverSegmentoActivo } from "@/lib/segmented-control";
@@ -20,8 +20,9 @@ export function SegmentedControl({ segmentos, activo, paramName = "vista" }: Seg
 
   return (
     <nav aria-label="Navegación secundaria" className="flex w-full border-b border-border">
-      {segmentos.map((segmento) => {
+      {segmentos.map((segmento, indice) => {
         const esActivo = segmento.valor === activoResuelto;
+        const alineacion = alineacionSegmento(indice, segmentos.length);
 
         return (
           <Link
@@ -29,7 +30,10 @@ export function SegmentedControl({ segmentos, activo, paramName = "vista" }: Seg
             href={`?${paramName}=${segmento.valor}`}
             aria-current={esActivo ? "page" : undefined}
             className={cn(
-              "flex min-h-11 flex-1 items-center justify-center text-center text-sm transition-colors",
+              "flex min-h-11 flex-1 items-center text-sm transition-colors",
+              alineacion === "start" && "justify-start text-left",
+              alineacion === "center" && "justify-center text-center",
+              alineacion === "end" && "justify-end text-right",
               esActivo
                 ? "font-semibold text-foreground"
                 : "font-medium text-muted-foreground hover:text-foreground",

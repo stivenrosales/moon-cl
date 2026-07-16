@@ -10,7 +10,7 @@ export async function createQuote(input: unknown) {
   const user = await requireUser();
   const data = quoteSchema.parse(input);
 
-  const book = await db.book.findUnique({ where: { id: data.bookId } });
+  const book = await db.book.findUnique({ where: { id: data.bookId }, select: { id: true } });
   if (!book) throw new Error("Libro no encontrado");
 
   const quote = await db.quote.create({

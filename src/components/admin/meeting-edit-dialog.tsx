@@ -116,7 +116,7 @@ export function MeetingEditDialog({ meeting, books, redirectOnDeleteTo }: Meetin
           <span className="sm:hidden sr-only">Editar reunión</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Editar reunión</DialogTitle>
           <DialogDescription>Cambia fecha, tipo, lugar o enlace.</DialogDescription>

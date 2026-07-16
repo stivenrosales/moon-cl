@@ -52,6 +52,19 @@ function intersect(a: ReadonlySet<string>, b: ReadonlySet<string>): string[] {
 }
 
 /**
+ * Cantidad de libros en común entre dos sets de bookIds YA CARGADOS (mismo
+ * criterio que booksInCommon() en services/social.ts: unión de UserBook +
+ * Rating). Pensado para reemplazar ese cálculo cuando los bookIds de ambos
+ * usuarios ya vinieron de loadAffinityData() — cruce en memoria, cero
+ * queries adicionales, en vez de repetir booksInCommon(viewerId, otherId)
+ * por cada miembro de una lista (ahí el viewer nunca cambia entre
+ * iteraciones, así que sus bookIds se piden una sola vez).
+ */
+export function countBooksInCommon(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  return intersect(a, b).length;
+}
+
+/**
  * 1 - (diferencia media absoluta de estrellas / 4), solo sobre los libros
  * que AMBOS calificaron. null si no hay ningún libro calificado por los dos
  * (no hay con qué comparar, no es que se parezcan "cero").

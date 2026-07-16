@@ -196,13 +196,11 @@ export async function nextNudge(
   client: NudgeClient = db,
   now: Date = new Date(),
 ): Promise<Nudge | null> {
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { onboardedAt: true, createdAt: true, isMatchOptIn: true },
-  });
-  if (!user) return null;
-
+  // user.findUnique NO depende de ninguna de las queries de abajo (todas
+  // solo necesitan userId, ya conocido): va en el mismo Promise.all en vez
+  // de esperar sola su propio round-trip antes de disparar el resto.
   const [
+    user,
     userBookCount,
     readingProgressCount,
     firstFinished,
@@ -213,6 +211,10 @@ export async function nextNudge(
     openRound,
     dismissedRows,
   ] = await Promise.all([
+    client.user.findUnique({
+      where: { id: userId },
+      select: { onboardedAt: true, createdAt: true, isMatchOptIn: true },
+    }),
     client.userBook.count({ where: { userId } }),
     client.readingProgress.count({ where: { userId } }),
     client.userBook.findFirst({
@@ -245,6 +247,8 @@ export async function nextNudge(
       select: { key: true },
     }),
   ]);
+
+  if (!user) return null;
 
   let hasSuggestionInOpenRound = false;
   if (openRound) {

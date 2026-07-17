@@ -106,11 +106,12 @@ describe("buildToday — estado B: sin-empezar", () => {
     expect(result).toMatchObject({ estado: "sin-empezar", kicker: "Tu lectura" });
   });
 
-  it("un UserBook recién creado por 'Lo voy a leer' (currentPage null) sigue siendo sin-empezar, no leyendo con 0%", () => {
-    // Reproduce el estado exacto que deja startReading(): status READING pero
-    // currentPage/currentChapter todavía en null porque nadie marcó avance.
-    // Si esto cayera en estado "leyendo", la card renderizaría la barra
-    // Progress en 0% — prohibido por contrato (Progress jamás en 0%).
+  it("sin-empezar exige !myUserBook: un UserBook existente (aunque currentPage sea null) no cae aquí", () => {
+    // Antes de este fix la condición era "!myUserBook || currentPage == null",
+    // lo cual ensanchaba sin-empezar de más y creaba un deadlock real: startReading()
+    // crea el UserBook con currentPage null, así que tras tocar "Lo voy a leer" el
+    // usuario JAMÁS salía de este estado — el botón seguía diciendo "Lo voy a leer"
+    // para siempre. Ver estado C: leyendo para el caso currentPage null correcto.
     const result = buildToday(
       baseInput({
         resolved: {
@@ -124,7 +125,7 @@ describe("buildToday — estado B: sin-empezar", () => {
       }),
     );
 
-    expect(result.estado).toBe("sin-empezar");
+    expect(result.estado).not.toBe("sin-empezar");
   });
 });
 
@@ -173,6 +174,47 @@ describe("buildToday — estado C: leyendo", () => {
     );
 
     expect(result).toMatchObject({ estado: "leyendo", miPagina: 0, miCapitulo: null, porcentaje: 0 });
+  });
+
+  it("un UserBook recién creado por startReading (currentPage null) cae en estado leyendo, no en sin-empezar", () => {
+    // Reproduce el estado exacto que deja startReading(): status READING pero
+    // currentPage/currentChapter todavía en null porque nadie marcó avance. Este
+    // es el caso que causaba el deadlock en producción: el botón "Lo voy a leer"
+    // debe desaparecer apenas el UserBook existe, sin importar si currentPage es null.
+    const result = buildToday(
+      baseInput({
+        resolved: {
+          book: BOOK_CIRCE,
+          isClubBook: true,
+          myUserBook: { status: "READING", currentPage: null, currentChapter: null },
+          myLastProgressAt: null,
+          otrosLectores: [{ userId: "u1", nombre: "Ana", currentPage: 120 }],
+          salaComments: [],
+        },
+      }),
+    );
+
+    expect(result.estado).toBe("leyendo");
+  });
+
+  it("el estado leyendo con currentPage null no expone porcentaje (la barra Progress no debe pintarse en 0%)", () => {
+    // La barra Progress solo se renderiza cuando currentPage > 0 (hero-card.tsx).
+    // Modelamos esto como porcentaje: null en vez de 0 para que la card pueda
+    // distinguir "nunca marcó avance" de "marcó avance real en la página 0".
+    const result = buildToday(
+      baseInput({
+        resolved: {
+          book: BOOK_CIRCE,
+          isClubBook: true,
+          myUserBook: { status: "READING", currentPage: null, currentChapter: null },
+          myLastProgressAt: null,
+          otrosLectores: [],
+          salaComments: [],
+        },
+      }),
+    );
+
+    expect(result).toMatchObject({ estado: "leyendo", miPagina: null, porcentaje: null });
   });
 
   it("marca alguienAdelante con el miembro más avanzado y la diferencia de páginas", () => {

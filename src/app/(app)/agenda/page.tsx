@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { CalendarDays, CalendarRange, Globe, List as ListIcon, MapPin, Vote } from "lucide-react";
 import { getSession } from "@/lib/session";
@@ -10,8 +11,10 @@ import { RoundStatusBadge } from "@/components/round-status-badge";
 import { MEETING_TYPE_BADGE_VARIANT, MEETING_TYPE_LABELS } from "@/lib/meeting-types";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { resolverSegmentoActivo } from "@/lib/segmented-control";
 import { rankByPoints } from "@/server/services/kahoot-ranking";
 import { SegmentedControl } from "@/components/segmented-control";
+import { LeaderboardSkeleton, MeetingCardsSkeleton } from "@/components/skeletons";
 import { KahootLeaderboard, type LeaderboardEntry, type ActivityLeaderboard } from "./kahoot-leaderboard";
 
 export const dynamic = "force-dynamic";
@@ -38,19 +41,28 @@ export default async function AgendaPage({
   searchParams: Promise<{ vista?: string }>;
 }) {
   const { vista: vistaRaw } = await searchParams;
-  const vista = vistaRaw === "votaciones" || vistaRaw === "trivia" ? vistaRaw : "reuniones";
+  const vista = resolverSegmentoActivo(SEGMENTOS, vistaRaw ?? "");
 
   return (
     <div className="space-y-6 md:space-y-8">
       <SegmentedControl segmentos={SEGMENTOS} activo={vista} />
 
-      {vista === "votaciones" ? (
-        <VotacionesView />
-      ) : vista === "trivia" ? (
-        <TriviaView />
-      ) : (
-        <ReunionesView />
-      )}
+      {/* key={vista}: fuerza a React a remontar el Suspense al cambiar de
+          vista dentro del mismo tab — sin esto, Next no vuelve a disparar
+          loading.tsx porque la ruta no cambia, y la pantalla se queda con
+          el contenido anterior mientras la query nueva corre en silencio. */}
+      <Suspense
+        key={vista}
+        fallback={vista === "trivia" ? <LeaderboardSkeleton /> : <MeetingCardsSkeleton />}
+      >
+        {vista === "votaciones" ? (
+          <VotacionesView />
+        ) : vista === "trivia" ? (
+          <TriviaView />
+        ) : (
+          <ReunionesView />
+        )}
+      </Suspense>
     </div>
   );
 }

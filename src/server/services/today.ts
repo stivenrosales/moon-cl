@@ -88,9 +88,11 @@ export type TodayHero =
       libro: TodayBook;
       kicker: TodayKicker;
       userBook: TodayUserBookInfo;
-      miPagina: number;
+      /** null si el UserBook existe pero nadie marcó avance todavía (recién creado por startReading()). */
+      miPagina: number | null;
       miCapitulo: number | null;
-      porcentaje: number;
+      /** null junto con miPagina null: nunca hubo avance, así que no hay porcentaje que mostrar (la barra no se pinta). */
+      porcentaje: number | null;
       alguienAdelante?: AlguienAdelante;
       comentariosNuevos: number;
       racha?: number;
@@ -178,12 +180,16 @@ export function buildToday(input: RawTodayInput): TodayHero {
   const kicker: TodayKicker = resolved.isClubBook ? "Libro del club" : "Tu lectura";
   const racha = computeRacha(myProgressDates);
 
-  // Sin UserBook, o con UserBook recién creado por "Lo voy a leer" pero sin
-  // página registrada todavía (currentPage null): ambos casos son
-  // funcionalmente "no empecé a leer" para la card. Si esto cayera en
-  // "leyendo", la barra Progress se renderizaría en 0% — prohibido: en
-  // estado B no hay barra, punto.
-  if (!resolved.myUserBook || resolved.myUserBook.currentPage == null) {
+  // Estado B ("sin-empezar") = el libro NO está en tu estantería, punto.
+  // No condicionar por currentPage: un UserBook recién creado por
+  // startReading() trae currentPage null a propósito (nadie marcó avance
+  // todavía) y AUN ASÍ es estado "leyendo" — ensanchar esta condición con
+  // "|| currentPage == null" fue el bug: creaba un deadlock donde "Lo voy
+  // a leer" nunca hacía desaparecer su propio botón, porque el UserBook que
+  // creaba seguía cayendo aquí. La ausencia de barra en 0% es un detalle de
+  // RENDERIZADO del estado C (ver más abajo y hero-card.tsx), no un estado
+  // distinto.
+  if (!resolved.myUserBook) {
     const pages = resolved.otrosLectores.map((o) => o.currentPage);
     return {
       estado: "sin-empezar",
@@ -195,10 +201,15 @@ export function buildToday(input: RawTodayInput): TodayHero {
     };
   }
 
-  const miPagina = resolved.myUserBook.currentPage ?? 0;
+  // Estado C ("leyendo"): el UserBook existe, aunque currentPage sea null.
+  // Preservamos la distinción null (nunca marcó avance) vs 0 (marcó avance
+  // real en la página 0) en vez de colapsarla con `?? 0` — así la card
+  // puede omitir la barra Progress solo cuando corresponde, sin tener que
+  // fingir que el usuario nunca empezó a leer el libro.
+  const miPagina = resolved.myUserBook.currentPage;
   const miCapitulo = resolved.myUserBook.currentChapter ?? null;
-  const porcentaje = pageProgress(miPagina, resolved.book.pageCount);
-  const alguienAdelante = pickAlguienAdelante(miPagina, resolved.otrosLectores);
+  const porcentaje = miPagina != null ? pageProgress(miPagina, resolved.book.pageCount) : null;
+  const alguienAdelante = pickAlguienAdelante(miPagina ?? 0, resolved.otrosLectores);
   const comentariosNuevos = countComentariosNuevos(
     resolved.salaComments,
     miCapitulo,

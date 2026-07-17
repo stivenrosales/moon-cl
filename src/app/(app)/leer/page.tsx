@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Library } from "lucide-react";
 import { getSession } from "@/lib/session";
@@ -13,8 +14,10 @@ import { AddToShelfDialog } from "@/components/add-to-shelf-dialog";
 import { ShelfBookRow, type ShelfBookRowData } from "@/components/shelf-book-row";
 import { SegmentedControl } from "@/components/segmented-control";
 import { NudgeCard } from "@/components/nudge-card";
+import { BookGridSkeleton, ShelfRowsSkeleton } from "@/components/skeletons";
 import { pageProgress } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { resolverSegmentoActivo } from "@/lib/segmented-control";
 import { nextNudge } from "@/server/services/nudge-queue";
 import type { ShelfStatus } from "@prisma/client";
 
@@ -33,18 +36,29 @@ export default async function LeerPage({
   searchParams: Promise<{ vista?: string }>;
 }) {
   const { vista } = await searchParams;
+  const vistaActiva = resolverSegmentoActivo(SEGMENTOS, vista ?? "");
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {vista !== "club" ? (
+      {vistaActiva !== "club" ? (
         <div className="flex justify-end">
           <AddToShelfDialog />
         </div>
       ) : null}
 
-      <SegmentedControl segmentos={SEGMENTOS} activo={vista ?? "mios"} />
+      <SegmentedControl segmentos={SEGMENTOS} activo={vistaActiva} />
 
-      {vista === "club" ? <BibliotecaClubView /> : <MiBibliotecaView />}
+      {/* key={vistaActiva}: al cambiar de vista dentro del mismo tab (mismo
+          segmento de ruta), Next NO vuelve a disparar loading.tsx porque no
+          hay boundary nuevo — el key es lo que fuerza a React a desmontar el
+          subárbol viejo y mostrar el fallback mientras la vista nueva
+          streamea, en vez de quedarse con el contenido anterior congelado. */}
+      <Suspense
+        key={vistaActiva}
+        fallback={vistaActiva === "club" ? <BookGridSkeleton /> : <ShelfRowsSkeleton />}
+      >
+        {vistaActiva === "club" ? <BibliotecaClubView /> : <MiBibliotecaView />}
+      </Suspense>
     </div>
   );
 }

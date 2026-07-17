@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { isModeratorOrAbove } from "@/lib/permissions";
@@ -8,6 +9,8 @@ import { MatchCard, type MatchCardMatch } from "@/components/match-card";
 import { MemberList, type MemberRow } from "@/components/member-list";
 import { SegmentedControl } from "@/components/segmented-control";
 import { NudgeCard } from "@/components/nudge-card";
+import { FeedCardsSkeleton, MemberRowsSkeleton, QuoteCardsSkeleton } from "@/components/skeletons";
+import { resolverSegmentoActivo } from "@/lib/segmented-control";
 import { nextNudge } from "@/server/services/nudge-queue";
 import { ActivityFeed } from "./activity-feed";
 import { QuotesPanel } from "./quotes-panel";
@@ -30,19 +33,36 @@ export default async function ClubPage({
   searchParams: Promise<{ vista?: string }>;
 }) {
   const { vista: vistaRaw } = await searchParams;
-  const vista = vistaRaw === "personas" || vistaRaw === "frases" ? vistaRaw : "actividad";
+  const vista = resolverSegmentoActivo(SEGMENTOS, vistaRaw ?? "");
 
   return (
     <div className="space-y-6 md:space-y-8">
       <SegmentedControl segmentos={SEGMENTOS} activo={vista} />
 
-      {vista === "personas" ? (
-        <PersonasView />
-      ) : vista === "frases" ? (
-        <FrasesView />
-      ) : (
-        <ActividadView />
-      )}
+      {/* key={vista}: fuerza a React a remontar el Suspense al cambiar de
+          vista dentro del mismo tab — sin esto, Next no vuelve a disparar
+          loading.tsx porque la ruta no cambia, y la pantalla se queda con
+          el contenido anterior mientras la query nueva corre en silencio. */}
+      <Suspense
+        key={vista}
+        fallback={
+          vista === "personas" ? (
+            <MemberRowsSkeleton />
+          ) : vista === "frases" ? (
+            <QuoteCardsSkeleton />
+          ) : (
+            <FeedCardsSkeleton />
+          )
+        }
+      >
+        {vista === "personas" ? (
+          <PersonasView />
+        ) : vista === "frases" ? (
+          <FrasesView />
+        ) : (
+          <ActividadView />
+        )}
+      </Suspense>
     </div>
   );
 }

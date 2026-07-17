@@ -134,7 +134,10 @@ function SinEmpezar({ hero }: { hero: Extract<TodayHero, { estado: "sin-empezar"
 
 function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) {
   const router = useRouter();
-  const [page, setPage] = React.useState(hero.miPagina);
+  // miPagina llega null cuando el UserBook recién se creó (startReading) y
+  // nadie marcó avance todavía — el input arranca en 0, no en null: es un
+  // input numérico controlado, necesita un valor.
+  const [page, setPage] = React.useState(hero.miPagina ?? 0);
   const [chapter, setChapter] = React.useState(hero.miCapitulo != null ? String(hero.miCapitulo) : "");
   const [submitting, setSubmitting] = React.useState(false);
   const [reward, setReward] = React.useState(false);
@@ -143,7 +146,7 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
   // Si loadToday trae datos nuevos (post router.refresh()), sincroniza los
   // campos controlados con el avance real ya guardado.
   React.useEffect(() => {
-    setPage(hero.miPagina);
+    setPage(hero.miPagina ?? 0);
     setChapter(hero.miCapitulo != null ? String(hero.miCapitulo) : "");
   }, [hero.miPagina, hero.miCapitulo]);
 
@@ -212,15 +215,21 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
           ) : null}
 
           <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <span>
-                pág. {hero.miPagina}
-                {hero.libro.pageCount ? ` de ${hero.libro.pageCount}` : ""}
-                {hero.miCapitulo != null ? ` · cap. ${hero.miCapitulo}` : ""}
-              </span>
-              <span className="tabular-nums text-accent-text">{hero.porcentaje}%</span>
-            </div>
-            <Progress value={hero.porcentaje} className="bg-secondary" indicatorClassName="bg-accent" />
+            {hero.miPagina ? (
+              <>
+                <div className="flex items-baseline justify-between text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  <span>
+                    pág. {hero.miPagina}
+                    {hero.libro.pageCount ? ` de ${hero.libro.pageCount}` : ""}
+                    {hero.miCapitulo != null ? ` · cap. ${hero.miCapitulo}` : ""}
+                  </span>
+                  <span className="tabular-nums text-accent-text">{hero.porcentaje}%</span>
+                </div>
+                <Progress value={hero.porcentaje ?? 0} className="bg-secondary" indicatorClassName="bg-accent" />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aún no has marcado tu avance.</p>
+            )}
           </div>
 
           {alguienAdelanteTexto ? (

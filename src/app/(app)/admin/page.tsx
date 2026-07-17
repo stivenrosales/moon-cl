@@ -78,13 +78,6 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8 md:space-y-10">
-      <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">Cabina del club</span>
-        <h1 className="h1-display display mt-2">
-          Panel <span className="hand-script italic text-primary">admin</span>
-        </h1>
-      </header>
-
       {/* Reportes — visible para MODERATOR y ADMIN (igual que Kahoot): es
           el único lugar del sistema donde se ve quién reportó y el hilo de
           DMs ajenos detrás de un reporte. */}

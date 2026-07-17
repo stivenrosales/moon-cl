@@ -271,7 +271,7 @@ function UpdateProgressDialog({
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Field>
+            <Field className="min-w-0">
               <Label htmlFor="shelf-page" optional>Página</Label>
               <Input
                 id="shelf-page"
@@ -286,7 +286,7 @@ function UpdateProgressDialog({
                 }}
               />
             </Field>
-            <Field>
+            <Field className="min-w-0">
               <Label htmlFor="shelf-chapter" optional>Capítulo</Label>
               <Input
                 id="shelf-chapter"

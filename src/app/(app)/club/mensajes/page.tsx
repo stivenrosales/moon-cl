@@ -25,15 +25,6 @@ export default async function MensajesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <span className="text-xs uppercase tracking-[0.32em] text-accent-text">
-          Conversaciones privadas
-        </span>
-        <h1 className="h1-display display mt-1.5">
-          <span className="hand-script italic text-primary">Mensajes</span>
-        </h1>
-      </header>
-
       <ConversationList rows={rows} viewerId={session.user.id} />
     </div>
   );

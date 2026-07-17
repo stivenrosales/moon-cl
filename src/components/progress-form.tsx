@@ -54,9 +54,9 @@ export function ProgressForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-[140px_140px_1fr] gap-4 items-end">
-        <Field>
-          <Label htmlFor="page" required>Página actual</Label>
+      <div className="flex flex-wrap items-end gap-4">
+        <Field className="w-24 min-w-0 shrink-0">
+          <Label htmlFor="page" required>Pág.</Label>
           <Input
             id="page"
             type="number"
@@ -67,8 +67,8 @@ export function ProgressForm({
             onChange={(e) => setPage(Math.max(0, Number(e.target.value || 0)))}
           />
         </Field>
-        <Field>
-          <Label htmlFor="chapter" optional>Capítulo actual</Label>
+        <Field className="w-24 min-w-0 shrink-0">
+          <Label htmlFor="chapter" optional>Cap.</Label>
           <Input
             id="chapter"
             type="number"
@@ -80,7 +80,7 @@ export function ProgressForm({
             placeholder="Cap."
           />
         </Field>
-        <div className="space-y-2">
+        <div className="min-w-[180px] flex-1 space-y-2">
           <div className="flex items-baseline justify-between text-xs uppercase tracking-[0.18em] text-muted-foreground">
             <span>Progreso</span>
             <span className="tabular-nums text-foreground">

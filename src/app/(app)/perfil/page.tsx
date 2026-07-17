@@ -3,7 +3,6 @@ import { Shield } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/book-cover";
@@ -70,23 +69,17 @@ export default async function PerfilPage() {
 
   return (
     <div className="space-y-7">
-      {/* Apariencia: arriba del fold porque en móvil este es el único lugar
-          para cambiar el tema (nav.tsx solo lo muestra en escritorio). */}
-      <section className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
-        <span className="text-sm font-medium text-foreground">Apariencia</span>
-        <ThemeToggle />
-      </section>
-
-      <header className="flex flex-col md:flex-row items-start gap-6">
-        <Avatar className="h-20 w-20">
+      {/* Identidad primero: avatar + nombre + rol + miembro desde.
+          El toggle de tema NO debe pesar más que quién sos. */}
+      <header className="flex items-center gap-4">
+        <Avatar className="h-14 w-14">
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
-          <AvatarFallback className="text-xl">
+          <AvatarFallback className="text-base">
             {getInitials(user.name, user.email)}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 space-y-2">
-          <span className="text-xs uppercase tracking-[0.32em] text-accent-text">Tu perfil</span>
-          <h1 className="h1-display display">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h1 className="h1-display display truncate">
             {user.name ?? user.email?.split("@")[0]}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
@@ -99,22 +92,49 @@ export default async function PerfilPage() {
         </div>
       </header>
 
+      {/* Ajustes de cuenta: Apariencia, Herramientas del club, Cerrar sesión.
+          Agrupados, filas compactas con etiqueta a la izquierda y control a
+          la derecha — nada de una card entera para un toggle binario.
+          Fuente de verdad: src/lib/account-access.ts */}
+      <section className="divide-y divide-border/60 rounded-2xl border border-border/60 bg-muted/20">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-sm font-medium text-foreground">Apariencia</span>
+          <ThemeToggle />
+        </div>
+        {isAccountAccessVisible("admin") ? (
+          <Link
+            href={routes.admin()}
+            className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/40"
+          >
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            Herramientas del club
+          </Link>
+        ) : null}
+        {isAccountAccessVisible("cerrar-sesion") ? (
+          <div className="px-4 py-3">
+            <SignOutButton />
+          </div>
+        ) : null}
+      </section>
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <ProfileStat label="Sugerencias" value={suggestions.length} />
-        <ProfileStat label="Votos emitidos" value={votes} />
-        <ProfileStat label="Comentarios" value={comments} />
-        <ProfileStat label="Valoraciones" value={ratings.length} />
+      <div className="grid grid-cols-4 gap-2">
+        <ProfileStat compact label="Sugerencias" value={suggestions.length} />
+        <ProfileStat compact label="Votos emitidos" value={votes} />
+        <ProfileStat compact label="Comentarios" value={comments} />
+        <ProfileStat compact label="Valoraciones" value={ratings.length} />
       </div>
 
       {/* Comunidad: seguidores/siguiendo, enlazan al directorio de miembros */}
-      <div className="grid grid-cols-2 gap-4 max-w-sm">
+      <div className="grid grid-cols-2 gap-2 max-w-sm">
         <ProfileStat
+          compact
           label="Seguidores"
           value={followCounts.followers}
           href={routes.club({ vista: "personas" })}
         />
         <ProfileStat
+          compact
           label="Siguiendo"
           value={followCounts.following}
           href={routes.club({ vista: "personas" })}
@@ -135,13 +155,6 @@ export default async function PerfilPage() {
             isMatchOptIn: user.isMatchOptIn,
           }}
         />
-        {isAccountAccessVisible("admin") ? (
-          <Button asChild variant="outline">
-            <Link href={routes.admin()}>
-              <Shield className="h-4 w-4" /> Herramientas del club
-            </Link>
-          </Button>
-        ) : null}
       </div>
 
       {/* Géneros favoritos */}
@@ -247,15 +260,6 @@ export default async function PerfilPage() {
           </ul>
         )}
       </section>
-
-      {/* Cerrar sesión: separado del resto, es el único acceso garantizado
-          en móvil para salir de la cuenta (signOut es un onSelect de React,
-          no una URL que se pueda teclear). */}
-      {isAccountAccessVisible("cerrar-sesion") ? (
-        <section className="border-t border-border/60 pt-6">
-          <SignOutButton />
-        </section>
-      ) : null}
     </div>
   );
 }

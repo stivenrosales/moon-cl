@@ -129,7 +129,10 @@ export const moveShelfSchema = z.object({
 
 export const updateMyBookSchema = z.object({
   bookId: z.string().min(1),
-  currentPage: z.number().int().positive().max(20000).optional().nullable(),
+  // .min(0), no .positive(): consistente con progressSchema.currentPage.
+  // La página 0 es un valor legítimo (portada/prólogo) y debe persistirse,
+  // no tratarse como "no declarado".
+  currentPage: z.number().int().min(0).max(20000).optional().nullable(),
   currentChapter: z.number().int().positive().max(2000).optional().nullable(),
 });
 

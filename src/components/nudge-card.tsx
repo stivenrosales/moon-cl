@@ -60,7 +60,11 @@ export function NudgeCard({ nudge, context, className }: NudgeCardProps) {
     setPending(true);
     try {
       if (action.type === "start-reading") {
-        if (action.libroId) await startReading(action.libroId);
+        // action.libroId ya no es opcional (resolveNudgeAction nunca emite
+        // start-reading sin id — ver nudge-card-copy.ts, Bug 1). Solo se
+        // marca actuado y se muestra éxito DESPUÉS de que el UserBook
+        // efectivamente se creó.
+        await startReading(action.libroId);
         await markNudgeActed(nudge.key);
         toast.success("Ya está en tu estantería — a leer ✦");
         setHidden(true);
@@ -77,7 +81,12 @@ export function NudgeCard({ nudge, context, className }: NudgeCardProps) {
         return;
       }
 
-      await markNudgeActed(nudge.key);
+      // navigate: no hay un efecto propio que esperar (la acción real ocurre
+      // en la pantalla de destino), así que NO se marca actedAt aquí — eso
+      // quemaría el nudge para siempre aunque el usuario nunca complete la
+      // acción (Bug 2). Solo se esconde localmente para esta sesión; volverá
+      // a evaluarse la próxima vez que se cargue la cola (buildNudgeQueue),
+      // y desaparecerá solo cuando su disparador deje de cumplirse.
       setHidden(true);
       router.push(action.href);
     } catch (err) {

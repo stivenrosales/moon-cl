@@ -285,6 +285,28 @@ describe("updateMyBook", () => {
     });
   });
 
+  it("persiste currentPage: 0 explícito en vez de tratarlo como ausente (contrato: página 0 es válida)", async () => {
+    userBookFindUniqueMock.mockResolvedValue({
+      id: "ub-1",
+      currentPage: 5,
+      currentChapter: 1,
+    });
+    updateProgressMock.mockResolvedValue({
+      progress: { id: "p-3" },
+      userBook: { id: "ub-1", currentPage: 0, currentChapter: 1 },
+    });
+
+    const result = await updateMyBook({ bookId: "book-1", currentPage: 0 });
+
+    expect(updateProgressMock).toHaveBeenCalledWith({
+      bookId: "book-1",
+      currentPage: 0,
+      chapter: null,
+    });
+    expect(userBookUpdateMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: "ub-1", currentPage: 0, currentChapter: 1 });
+  });
+
   it("actualiza solo currentChapter en el UserBook cuando no se declara currentPage", async () => {
     userBookFindUniqueMock.mockResolvedValue({
       id: "ub-1",

@@ -41,6 +41,20 @@ export interface NudgeCopy {
 export function resolveNudgeCopy(key: NudgeKey, ctx: NudgeCardContext = {}): NudgeCopy {
   switch (key) {
     case "bienvenida":
+      // Bug 1: sin libroId no hay libro sobre el cual crear un UserBook — el
+      // club puede estar entre rondas, o el usuario onboardeó antes de la
+      // primera elección. El copy NO puede prometer "Lo voy a leer" en ese
+      // caso: resolveNudgeAction (abajo) tampoco devuelve start-reading sin
+      // id, así que este branch y ese quedan sincronizados por construcción.
+      if (!ctx.libroId) {
+        return {
+          kicker: "BIENVENIDA AL CLUB",
+          title: "El club está entre rondas",
+          titleScript: true,
+          body: "Todavía no hay un libro de club activo. En cuanto se abra la próxima votación, aquí armamos tu estantería.",
+          cta: "Ver el club",
+        };
+      }
       return {
         kicker: "BIENVENIDA AL CLUB",
         title: "Empieza por un libro",
@@ -92,7 +106,10 @@ export function resolveNudgeCopy(key: NudgeKey, ctx: NudgeCardContext = {}): Nud
 }
 
 export type NudgeAction =
-  | { type: "start-reading"; libroId?: string }
+  // libroId ya NO es opcional: start-reading solo se devuelve cuando hay un
+  // id real (ver Bug 1). nudge-card.tsx puede llamar startReading(action.libroId)
+  // sin guardas — si el tipo es "start-reading", el id existe por contrato.
+  | { type: "start-reading"; libroId: string }
   | { type: "navigate"; href: string }
   | { type: "toggle-match" };
 
@@ -102,7 +119,12 @@ export type NudgeAction =
 export function resolveNudgeAction(key: NudgeKey, ctx: NudgeCardContext = {}): NudgeAction {
   switch (key) {
     case "bienvenida":
-      return { type: "start-reading", libroId: ctx.libroId };
+      // Bug 1: nunca prometer start-reading sin libroId — no hay UserBook
+      // que crear. Sin id, el CTA navega al club en su lugar (copy honesto
+      // arriba en resolveNudgeCopy).
+      return ctx.libroId
+        ? { type: "start-reading", libroId: ctx.libroId }
+        : { type: "navigate", href: routes.leer({ vista: "club" }) };
     case "primer-progreso":
       return { type: "navigate", href: routes.hoy() };
     case "primer-rating":

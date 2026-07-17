@@ -3,25 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { routes } from "@/lib/routes";
+import { pathForScreen } from "@/lib/nudge-paths";
 import { NUDGE_KEYS, NUDGE_SCREENS, type NudgeKey, type NudgeScreen } from "@/server/services/nudge-queue";
 import { requireUser } from "@/server/auth-helpers";
 
 const nudgeKeySchema = z.enum(NUDGE_KEYS);
-
-/** Traduce el screen semántico de la invitación a la ruta real que hay que revalidar. */
-function pathForScreen(screen: NudgeScreen): string {
-  switch (screen) {
-    case "hoy":
-      return routes.hoy();
-    case "leer-mios":
-      return routes.leer();
-    case "club-actividad":
-      return routes.club({ vista: "actividad" });
-    case "club-personas":
-      return routes.club({ vista: "personas" });
-  }
-}
 
 function revalidateNudgeScreen(key: NudgeKey) {
   revalidatePath(pathForScreen(NUDGE_SCREENS[key]));

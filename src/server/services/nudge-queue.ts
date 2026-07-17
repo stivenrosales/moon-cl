@@ -114,6 +114,14 @@ function checkPrimerProgreso(input: NudgeQueueInput): boolean {
   return input.userBookCount >= 1 && input.readingProgressCount === 0;
 }
 
+// OJO (Bug 2, nudge-card.tsx): su acción es "navigate" y ya no marca actedAt
+// al clic. Pero este disparador depende solo de hasFinishedFirstBook/
+// firstFinishedAt — calificar el libro NO lo apaga. Sin un actedAt persistido
+// en algún punto (ej. al calificar, en la página del libro), este nudge
+// reaparece en cada carga de la cola aunque el usuario ya haya calificado.
+// Pendiente: la página de detalle del libro (fuera del alcance de este
+// arreglo) debería llamar markNudgeActed("primer-rating") cuando se registra
+// el rating.
 function checkPrimerRating(input: NudgeQueueInput): boolean {
   return input.hasFinishedFirstBook && afterEpoch(input.firstFinishedAt);
 }
@@ -122,6 +130,11 @@ function checkBookMatch(input: NudgeQueueInput): boolean {
   return input.ratingCount === 3 && !input.isMatchOptIn && afterEpoch(input.latestRatingAt);
 }
 
+// OJO (Bug 2, nudge-card.tsx): mismo caso que checkPrimerRating. El disparador
+// es followCount === 2 — mandar el mensaje no cambia followCount, así que no
+// se auto-apaga. Pendiente: la pantalla de mensajes (fuera del alcance de
+// este arreglo) debería llamar markNudgeActed("primer-mensaje") al enviar el
+// primer mensaje a esa persona.
 function checkPrimerMensaje(input: NudgeQueueInput): boolean {
   return input.followCount === 2 && afterEpoch(input.latestFollowAt);
 }

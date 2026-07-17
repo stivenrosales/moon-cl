@@ -14,10 +14,12 @@ import { AddToShelfDialog } from "@/components/add-to-shelf-dialog";
 import { ShelfBookRow, type ShelfBookRowData } from "@/components/shelf-book-row";
 import { SegmentedControl } from "@/components/segmented-control";
 import { NudgeCard } from "@/components/nudge-card";
+import { StartReadingButton } from "@/components/start-reading-button";
 import { BookGridSkeleton, ShelfRowsSkeleton } from "@/components/skeletons";
 import { pageProgress } from "@/lib/utils";
 import { routes } from "@/lib/routes";
 import { resolverSegmentoActivo } from "@/lib/segmented-control";
+import { resolveClubRowMode } from "@/lib/club-reading-row";
 import { nextNudge } from "@/server/services/nudge-queue";
 import type { ShelfStatus } from "@prisma/client";
 
@@ -94,7 +96,15 @@ async function MiBibliotecaView() {
     .sort((a, b) => a.finishedAt.getTime() - b.finishedAt.getTime())[0] ?? null;
 
   const clubBookId = currentClubBook?.id;
-  const showClubRow = !!currentClubBook;
+  // "progress": el usuario tiene UserBook READING para el libro del club →
+  // fila con avance real. "invite": no tiene NINGÚN UserBook para ese libro
+  // → fila honesta de invitación, sin barra ni "Continuar". "none": no hay
+  // libro actual, o el usuario ya lo tiene en Quiero leer/Leído (aparece en
+  // su propia pestaña, no hace falta duplicarlo acá). Ver club-reading-row.ts.
+  const clubRowMode = resolveClubRowMode(
+    clubBookId,
+    userBooks.map((ub) => ({ bookId: ub.bookId, status: ub.status })),
+  );
 
   const readingItems = userBooks.filter(
     (ub) => ub.status === "READING" && ub.bookId !== clubBookId,
@@ -102,7 +112,14 @@ async function MiBibliotecaView() {
   const wantToReadItems = userBooks.filter((ub) => ub.status === "WANT_TO_READ");
   const finishedItems = userBooks.filter((ub) => ub.status === "FINISHED");
 
-  const readingCount = readingItems.length + (showClubRow ? 1 : 0);
+  // El contador "Leyendo" solo suma la fila del club cuando es progreso
+  // real: la fila de invitación NO cuenta como "estás leyendo esto" — es
+  // justo la mentira que se estaba mostrando antes.
+  const readingCount = readingItems.length + (clubRowMode === "progress" ? 1 : 0);
+  // La sección "Leyendo" se pinta si hay progreso real O si hay una
+  // invitación que mostrar — la invitación no debe quedar oculta detrás del
+  // EmptyState solo porque el contador está en 0.
+  const showReadingSection = readingCount > 0 || clubRowMode === "invite";
 
   return (
     <div className="space-y-4">
@@ -130,18 +147,21 @@ async function MiBibliotecaView() {
       </TabsList>
 
       <TabsContent value="reading" className="space-y-3">
-        {readingCount === 0 ? (
+        {!showReadingSection ? (
           <EmptyState
             message="Aún no hay libros en Leyendo"
             hint="Agrega uno para empezar a llevar tu avance."
           />
         ) : (
           <div className="space-y-3">
-            {showClubRow && currentClubBook ? (
+            {clubRowMode === "progress" && currentClubBook ? (
               <ClubCurrentBookCard
                 book={currentClubBook}
                 progress={myClubProgress ? { currentPage: myClubProgress.currentPage } : null}
               />
+            ) : null}
+            {clubRowMode === "invite" && currentClubBook ? (
+              <ClubInviteCard book={currentClubBook} />
             ) : null}
             {readingItems.map((ub) => (
               <ShelfBookRow key={ub.id} item={toRowData(ub)} />
@@ -315,6 +335,55 @@ function ClubCurrentBookCard({
         <Button asChild size="sm" variant="outline" className="shrink-0">
           <Link href={routes.libro(book.id)}>Continuar</Link>
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+// Fila de invitación: el libro actual del club, pero el usuario NO tiene
+// UserBook para él todavía. Misma estructura visual que ClubCurrentBookCard
+// para que se sienta parte de la misma familia, pero CERO barra de progreso
+// y CERO "Continuar" — nada que implique que ya empezaste. El CTA es
+// honesto: "Lo voy a leer" crea el UserBook recién en este momento (ver
+// StartReadingButton), y "Ver de qué va" solo lleva al detalle del libro.
+function ClubInviteCard({
+  book,
+}: {
+  book: {
+    id: string;
+    title: string;
+    authors: string[];
+    coverUrl: string | null;
+  };
+}) {
+  return (
+    <Card className="p-2.5 sm:p-3">
+      <div className="flex items-center gap-3">
+        <Link href={routes.libro(book.id)} className="focus-ring shrink-0 rounded-md">
+          <BookCover src={book.coverUrl} title={book.title} size="sm" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link href={routes.libro(book.id)} className="focus-ring min-w-0 rounded-sm">
+              <p className="line-clamp-1 font-medium leading-snug hover:text-primary transition-colors">
+                {book.title}
+              </p>
+            </Link>
+            <Badge variant="gold" className="shrink-0">CLUB</Badge>
+          </div>
+          {book.authors.length ? (
+            <p className="line-clamp-1 text-xs text-muted-foreground">{book.authors.join(", ")}</p>
+          ) : null}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            El club está leyendo esto ahora. Todavía no lo agregaste a tu estantería.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+          <StartReadingButton bookId={book.id} />
+          <Button asChild size="sm" variant="outline">
+            <Link href={routes.libro(book.id)}>Ver de qué va</Link>
+          </Button>
+        </div>
       </div>
     </Card>
   );

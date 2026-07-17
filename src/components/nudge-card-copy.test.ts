@@ -3,8 +3,8 @@ import { resolveNudgeAction, resolveNudgeCopy } from "@/components/nudge-card-co
 import { routes } from "@/lib/routes";
 
 describe("resolveNudgeCopy", () => {
-  it("bienvenida interpola el libro del club y usa hand-script", () => {
-    const copy = resolveNudgeCopy("bienvenida", { libro: "Cien años de soledad" });
+  it("bienvenida interpola el libro del club y usa hand-script cuando hay libroId", () => {
+    const copy = resolveNudgeCopy("bienvenida", { libro: "Cien años de soledad", libroId: "book-1" });
     expect(copy).toEqual({
       kicker: "BIENVENIDA AL CLUB",
       title: "Empieza por un libro",
@@ -14,11 +14,19 @@ describe("resolveNudgeCopy", () => {
     });
   });
 
-  it("bienvenida cae a un fallback genérico si no hay contexto", () => {
+  it("bienvenida sin libroId NO promete 'Lo voy a leer' (no hay UserBook que crear): cae a un CTA honesto", () => {
+    // Bug 1: si el CTA promete start-reading sin libroId, nudge-card.tsx marca
+    // éxito y actedAt sin haber creado ningún UserBook. El copy no puede
+    // ofrecer esa acción cuando no hay libro resuelto.
     const copy = resolveNudgeCopy("bienvenida");
-    expect(copy.body).toBe(
-      "El club está leyendo el libro del club. Ponlo en tu estantería y te vamos siguiendo el paso.",
-    );
+    expect(copy.cta).not.toBe("Lo voy a leer");
+    expect(copy.cta).toBe("Ver el club");
+    expect(copy.body).not.toContain("Ponlo en tu estantería");
+  });
+
+  it("bienvenida con título de libro pero sin libroId también cae al CTA honesto (el id es lo que importa, no el título)", () => {
+    const copy = resolveNudgeCopy("bienvenida", { libro: "Cien años de soledad" });
+    expect(copy.cta).toBe("Ver el club");
   });
 
   it("primer-progreso no depende de contexto", () => {
@@ -73,6 +81,15 @@ describe("resolveNudgeAction", () => {
     expect(resolveNudgeAction("bienvenida", { libroId: "book-1" })).toEqual({
       type: "start-reading",
       libroId: "book-1",
+    });
+  });
+
+  it("bienvenida sin libroId no puede prometer start-reading: navega a /leer?vista=club en su lugar", () => {
+    // Bug 1: sin libroId no hay UserBook que crear. resolveNudgeAction jamás
+    // debe devolver start-reading sin un id real.
+    expect(resolveNudgeAction("bienvenida")).toEqual({
+      type: "navigate",
+      href: routes.leer({ vista: "club" }),
     });
   });
 

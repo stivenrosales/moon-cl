@@ -26,6 +26,7 @@ import { BookCover } from "@/components/book-cover";
 import { startReading } from "@/server/actions/shelves";
 import { updateProgress } from "@/server/actions/progress";
 import { routes } from "@/lib/routes";
+import { resolverAvanceCopy } from "@/lib/reading-progress-copy";
 import type { TodayHero } from "@/server/services/today";
 
 function pluralize(count: number, singular: string, plural: string) {
@@ -135,9 +136,12 @@ function SinEmpezar({ hero }: { hero: Extract<TodayHero, { estado: "sin-empezar"
 function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) {
   const router = useRouter();
   // miPagina llega null cuando el UserBook recién se creó (startReading) y
-  // nadie marcó avance todavía — el input arranca en 0, no en null: es un
-  // input numérico controlado, necesita un valor.
-  const [page, setPage] = React.useState(hero.miPagina ?? 0);
+  // nadie marcó avance todavía. El input arranca vacío en ese caso — NO en
+  // 0 — porque un 0 pre-cargado invita a guardar un avance que el usuario
+  // nunca declaró. Sigue siendo un input controlado ("" es un valor válido
+  // para React, no undefined), así que nunca salta de no-controlado a
+  // controlado.
+  const [page, setPage] = React.useState<number | "">(hero.miPagina ?? "");
   const [chapter, setChapter] = React.useState(hero.miCapitulo != null ? String(hero.miCapitulo) : "");
   const [submitting, setSubmitting] = React.useState(false);
   const [reward, setReward] = React.useState(false);
@@ -146,7 +150,7 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
   // Si loadToday trae datos nuevos (post router.refresh()), sincroniza los
   // campos controlados con el avance real ya guardado.
   React.useEffect(() => {
-    setPage(hero.miPagina ?? 0);
+    setPage(hero.miPagina ?? "");
     setChapter(hero.miCapitulo != null ? String(hero.miCapitulo) : "");
   }, [hero.miPagina, hero.miCapitulo]);
 
@@ -168,6 +172,10 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (page === "") {
+      toast.error("La página es obligatoria");
+      return;
+    }
     if (!chapter.trim()) {
       toast.error("El capítulo es obligatorio: es lo que abre las salas del foro");
       return;
@@ -189,6 +197,8 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
       setSubmitting(false);
     }
   }
+
+  const avanceCopy = resolverAvanceCopy(hero.miPagina);
 
   const alguienAdelanteTexto = hero.alguienAdelante
     ? `${hero.alguienAdelante.nombre} va ${hero.alguienAdelante.paginasDiferencia} ${pluralize(
@@ -215,7 +225,7 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
           ) : null}
 
           <div className="space-y-1.5">
-            {hero.miPagina ? (
+            {avanceCopy.tipo === "con-progreso" ? (
               <>
                 <div className="flex items-baseline justify-between text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   <span>
@@ -228,7 +238,7 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
                 <Progress value={hero.porcentaje ?? 0} className="bg-secondary" indicatorClassName="bg-accent" />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">Aún no has marcado tu avance.</p>
+              <p className="text-sm text-muted-foreground">{avanceCopy.texto}</p>
             )}
           </div>
 
@@ -276,7 +286,10 @@ function Leyendo({ hero }: { hero: Extract<TodayHero, { estado: "leyendo" }> }) 
                 min={0}
                 max={hero.libro.pageCount ?? 20000}
                 value={page}
-                onChange={(e) => setPage(Math.max(0, Number(e.target.value || 0)))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setPage(raw === "" ? "" : Math.max(0, Number(raw)));
+                }}
               />
             </Field>
             <Field className="w-24">

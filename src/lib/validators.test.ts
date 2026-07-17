@@ -710,8 +710,13 @@ describe("updateMyBookSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rechaza currentPage igual a 0 (no positivo)", () => {
+  it("acepta currentPage igual a 0 (consistente con progressSchema: la página 0 es un valor válido, no ausente)", () => {
     const result = updateMyBookSchema.safeParse({ bookId: "book-1", currentPage: 0 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza currentPage negativo", () => {
+    const result = updateMyBookSchema.safeParse({ bookId: "book-1", currentPage: -1 });
     expect(result.success).toBe(false);
   });
 

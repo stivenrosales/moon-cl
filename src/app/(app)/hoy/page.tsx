@@ -13,6 +13,7 @@ import { ActivityFeed } from "@/app/(app)/club/activity-feed";
 import { formatDateTime, relativeTime } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { routes } from "@/lib/routes";
+import { shouldSuppressHeroNudge } from "@/lib/hero-nudge";
 import { loadToday } from "@/server/services/today";
 import { loadUrgency, type UrgencySlot } from "@/server/services/urgency-queue";
 import { loadFeed } from "@/server/services/feed";
@@ -80,7 +81,19 @@ export default async function HoyPage() {
 
   // "bienvenida" pinta como card propia bajo la héroe; "sugerir" es inline
   // (inline: true) y se pasa a la card de votación de abajo — no gasta slot.
-  const heroNudge = nudge && nudge.screen === "hoy" && !nudge.inline ? nudge : null;
+  //
+  // Cuando hero.estado === "sin-empezar", HeroCard YA pinta su propio botón
+  // "Lo voy a leer" para el mismo libro (ver hero-card.tsx, SinEmpezar) —
+  // exactamente la misma acción que el nudge "bienvenida". Sin suprimirlo
+  // acá, las dos cards salían apiladas ofreciendo lo mismo dos veces. Ver
+  // shouldSuppressHeroNudge en @/lib/hero-nudge.ts.
+  const heroNudge =
+    nudge &&
+    nudge.screen === "hoy" &&
+    !nudge.inline &&
+    !shouldSuppressHeroNudge({ heroEstado: hero.estado, nudgeKey: nudge.key })
+      ? nudge
+      : null;
   const inlineSugerirNudge = nudge && nudge.screen === "hoy" && nudge.inline ? nudge : null;
   const libroActual = hero.estado !== "sin-libro" ? hero.libro : null;
 

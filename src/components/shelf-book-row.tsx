@@ -226,7 +226,10 @@ function UpdateProgressDialog({
   initialPage: number;
   initialChapter?: number;
 }) {
-  const [page, setPage] = React.useState(initialPage);
+  // number | "": "" es el sentinel de "campo vacío" (mismo patrón que
+  // hero-card.tsx). Con page: number, "0 || undefined" perdía la página 0
+  // antes de llegar a la action porque 0 es falsy en JS.
+  const [page, setPage] = React.useState<number | "">(initialPage);
   const [chapter, setChapter] = React.useState<string>(
     initialChapter ? String(initialChapter) : "",
   );
@@ -245,7 +248,9 @@ function UpdateProgressDialog({
     try {
       await updateMyBook({
         bookId,
-        currentPage: page || undefined,
+        // page === "" (no falsy): la página 0 es un valor válido y debe
+        // enviarse tal cual, no perderse como si nunca se hubiera declarado.
+        currentPage: page === "" ? undefined : page,
         currentChapter: chapter ? Number(chapter) : undefined,
       });
       toast.success("Avance actualizado");
@@ -272,10 +277,13 @@ function UpdateProgressDialog({
                 id="shelf-page"
                 type="number"
                 inputMode="numeric"
-                min={1}
+                min={0}
                 max={totalPages ?? 20000}
-                value={page || ""}
-                onChange={(e) => setPage(Math.max(0, Number(e.target.value || 0)))}
+                value={page}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setPage(raw === "" ? "" : Math.max(0, Number(raw)));
+                }}
               />
             </Field>
             <Field>

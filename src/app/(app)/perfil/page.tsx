@@ -1,16 +1,21 @@
 import Link from "next/link";
+import { Shield } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { db } from "@/lib/db";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { BookCover } from "@/components/book-cover";
 import { StarRating } from "@/components/star-rating";
 import { ProfileEditDialog } from "@/components/profile-edit-dialog";
 import { ProfileStat } from "@/components/profile-stat";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { SignOutButton } from "@/components/sign-out-button";
 import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { getAccountAccessItems, type AccountAccessKey } from "@/lib/account-access";
 import type { Role } from "@prisma/client";
 
 const roleLabel: Record<Role, string> = {
@@ -59,8 +64,19 @@ export default async function PerfilPage() {
 
   if (!user) return null;
 
+  const accountAccess = getAccountAccessItems(user.role);
+  const isAccountAccessVisible = (key: AccountAccessKey) =>
+    accountAccess.find((item) => item.key === key)?.visible ?? false;
+
   return (
     <div className="space-y-7">
+      {/* Apariencia: arriba del fold porque en móvil este es el único lugar
+          para cambiar el tema (nav.tsx solo lo muestra en escritorio). */}
+      <section className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/30 px-4 py-3">
+        <span className="text-sm font-medium text-foreground">Apariencia</span>
+        <ThemeToggle />
+      </section>
+
       <header className="flex flex-col md:flex-row items-start gap-6">
         <Avatar className="h-20 w-20">
           {user.image ? <AvatarImage src={user.image} alt="" /> : null}
@@ -119,6 +135,13 @@ export default async function PerfilPage() {
             isMatchOptIn: user.isMatchOptIn,
           }}
         />
+        {isAccountAccessVisible("admin") ? (
+          <Button asChild variant="outline">
+            <Link href={routes.admin()}>
+              <Shield className="h-4 w-4" /> Herramientas del club
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       {/* Géneros favoritos */}
@@ -224,6 +247,15 @@ export default async function PerfilPage() {
           </ul>
         )}
       </section>
+
+      {/* Cerrar sesión: separado del resto, es el único acceso garantizado
+          en móvil para salir de la cuenta (signOut es un onSelect de React,
+          no una URL que se pueda teclear). */}
+      {isAccountAccessVisible("cerrar-sesion") ? (
+        <section className="border-t border-border/60 pt-6">
+          <SignOutButton />
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -21,6 +21,8 @@ vi.mock("next/cache", () => ({
 }));
 
 import { dismissNudge, markNudgeActed } from "@/server/actions/nudges";
+import { pathForScreen } from "@/lib/nudge-paths";
+import { NUDGE_SCREENS, type NudgeScreen } from "@/server/services/nudge-queue";
 
 const USER = { id: "user-1", role: "MEMBER" };
 
@@ -71,7 +73,10 @@ describe("markNudgeActed", () => {
       create: { userId: "user-1", key: "primer-mensaje", actedAt: expect.any(Date) },
       update: { actedAt: expect.any(Date) },
     });
-    expect(revalidatePathMock).toHaveBeenCalledWith("/club?vista=personas");
+    // Bug 3: revalidatePath jamás debe recibir un path con query string — es
+    // el único contrato que routes.test.ts hace cumplir para src/lib/routes.ts,
+    // y pathForScreen lo violaba para club-personas.
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
   });
 
   it("requiere sesión iniciada", async () => {
@@ -79,5 +84,22 @@ describe("markNudgeActed", () => {
 
     await expect(markNudgeActed("bienvenida")).rejects.toThrow("Debes iniciar sesión");
     expect(upsertMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("contrato de revalidatePath — pathForScreen nunca emite query ni fragmento", () => {
+  it("ninguna de las 4 pantallas devuelve un path con '?' o '#'", () => {
+    const screens = new Set<NudgeScreen>(Object.values(NUDGE_SCREENS));
+
+    for (const screen of screens) {
+      const path = pathForScreen(screen);
+      expect(path).not.toContain("?");
+      expect(path).not.toContain("#");
+    }
+  });
+
+  it("club-actividad y club-personas revalidan el mismo path pelado /club", () => {
+    expect(pathForScreen("club-actividad")).toBe("/club");
+    expect(pathForScreen("club-personas")).toBe("/club");
   });
 });

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm run dev            # servidor de desarrollo
-npm test               # vitest run (620 tests / 47 archivos, ~3s)
+npm test               # vitest run (671 tests / 52 archivos, ~2s)
 npm run test:watch     # vitest en watch
 npx tsc --noEmit       # chequeo de tipos — el gate real de este repo
 npm run build          # prisma generate && next build — NO toca la base
@@ -14,6 +14,8 @@ npm run db:push        # aplica schema.prisma a la BD (ver "Base de datos")
 npm run db:studio      # explorar la BD
 npm run db:seed        # tsx prisma/seed.ts
 npm run db:backfill-nudges  # siembra UserNudge de usuarias previas a NUDGE_EPOCH
+
+docker compose up --build   # verificar la imagen en local (ver "Despliegue")
 ```
 
 **`npm run db:migrate` está en `package.json` pero no lo corras.** Este repo no usa
@@ -89,8 +91,9 @@ propósito: un 308 lo cachea el navegador para siempre. Si mueves una ruta, agre
 redirect ahí.
 
 **El README.md describe la estructura anterior a esa reestructuración** (`/dashboard`,
-`/rondas`, `/reuniones`, `/biblioteca`). No lo uses como mapa del código; sí sigue siendo
-válido para stack, setup y despliegue.
+`/rondas`, `/reuniones`, `/biblioteca`). No lo uses como mapa del código. Su sección de
+despliegue **también quedó obsoleta**: habla de Vercel + Neon + Resend, y ya no se despliega
+así (ver "Despliegue"). Sigue siendo válido para stack y setup local.
 
 ### Vistas dentro de un destino
 
@@ -151,11 +154,19 @@ cara a todo el club el día del deploy.
 
 ### Cron
 
-Vercel Hobby permite 2 crons con 1 ejecución/día, así que **todos** los jobs cuelgan de un
-dispatcher único: `src/app/api/cron/daily/route.ts` (autenticado con `Bearer $CRON_SECRET`).
-Agregar un job es agregar una entrada al array `jobs` e implementarlo en
-`src/server/jobs/`. Los jobs que no son diarios se auto-descartan por fecha dentro de su
-propia función (`runBookMatch` sale si no es lunes en `America/Lima`).
+**Todos** los jobs cuelgan de un dispatcher único: `src/app/api/cron/daily/route.ts`
+(autenticado con `Bearer $CRON_SECRET`). Agregar un job es agregar una entrada al array
+`jobs` e implementarlo en `src/server/jobs/`. Los jobs que no son diarios se auto-descartan
+por fecha dentro de su propia función (`runBookMatch` sale si no es lunes en `America/Lima`).
+
+El dispatcher nació por el límite de Vercel Hobby (2 crons, 1 ejecución/día). Ese límite ya
+no existe —el disparador vive en `/etc/cron.d/moon-cl` del VPS— pero el patrón se mantiene:
+un solo punto de entrada autenticado es más fácil de auditar que N endpoints. No lo partas
+en varias rutas solo porque ahora se puede.
+
+`runBookMatch` **no es idempotente**: escribe con `db.match.create` dentro de un loop que
+además manda el email, sin transacción. Dispararlo dos veces el mismo lunes revienta con
+violación de constraint después de haber enviado correos. Ojo al reintentar el cron a mano.
 
 Las fechas de negocio se calculan en `America/Lima`, no en UTC — rachas, cumpleaños y
 recordatorios se rompen cerca de medianoche si usas UTC.
@@ -193,10 +204,19 @@ por persona y nunca vuelve. `reason: 'pre-existing'` marca las filas del backfil
 
 ## Base de datos
 
+Producción corre **PostgreSQL 17** en el VPS (servicio `moon-postgres` de EasyPanel,
+alcanzable solo por la red interna `easypanel-haiku`). La versión no es casual: la base
+venía de Neon 17, y un dump de una mayor no restaura en una menor.
+
 **No hay `prisma/migrations/`.** El schema se aplica con `prisma db push` corrido a mano por
-un humano. El build de Vercel (`prisma generate && next build`) **no toca la base**: si
-cambias el schema y nadie corre `db push` contra producción, el deploy queda desincronizado
-y el código nuevo rompe en runtime contra columnas que no existen.
+un humano. Ni el CI ni el contenedor tocan la base: el `CMD` del Dockerfile arranca la app y
+nada más. Si cambias el schema y nadie corre `db push` contra producción, el deploy queda
+desincronizado y el código nuevo rompe en runtime contra columnas que no existen.
+
+Hay backup diario en el VPS (`/root/backup-moon-cl.sh`, 11:20 UTC, retiene 14 días en
+`/root/backups/moon-cl/`). Descarta a propósito los dumps de menos de 1KB: un respaldo vacío
+que se guarda como bueno es peor que no tener respaldo, porque te enteras el día que lo
+necesitas.
 
 Antes de cualquier cambio de schema lee `docs/MIGRATIONS.md`. Regla corta: escribe el cambio
 como aditivo (columnas opcionales o con `@default`), aplícalo a producción **antes** de
@@ -208,6 +228,54 @@ Ciclo local: editar `schema.prisma` → `npx prisma format` → `npx prisma vali
 `prisma/init.sql` es un dump del schema inicial que **no lo referencia nadie** y no se
 mantiene. No es la migración base ni el estado actual de la BD: la fuente de verdad es
 `schema.prisma`. No lo edites ni lo apliques.
+
+## Despliegue
+
+Ya **no es Vercel**. La app corre dockerizada en un VPS con EasyPanel (proyecto `haiku`,
+junto a otras apps que no son de este repo).
+
+```
+git push main → GitHub Actions (gate: tsc + vitest) → imagen a GHCR → EasyPanel hace pull
+```
+
+El VPS **nunca buildea**: ya corre ~19 contenedores y un `next build` le competiría por la
+RAM. `.github/workflows/docker.yml` corre el gate y solo entonces publica
+`ghcr.io/stivenrosales/moon-cl` (tags `sha-<corto>` y `latest`) — el tag por SHA es lo que
+permite volver atrás sin rebuildear.
+
+Dos cosas del `Dockerfile` que parecen ruido y no lo son:
+
+- **`apk add openssl` en los tres stages.** Sin él, `prisma generate` arma el motor para
+  `openssl-1.1.x`, que ya no existe en el Alpine moderno. No falla en el build: falla en la
+  primera query a Postgres, en producción.
+- **`npm install -g npm@11`.** `node:20-alpine` trae npm 10, que resuelve distinto una
+  peerDependency opcional de next-auth y hace fallar `npm ci` contra un lockfile
+  perfectamente sincronizado. El mismo arreglo hace falta en el workflow, por la misma razón.
+
+`HOSTNAME=0.0.0.0` tampoco es adorno: el standalone de Next escucha en localhost por defecto
+y Traefik —el proxy de EasyPanel, que también resuelve el TLS— nunca lo alcanzaría.
+
+`docker-compose.yml` es **solo para verificación local**. En producción Postgres es un
+servicio aparte de EasyPanel, no un contenedor de ese archivo.
+
+### Storage
+
+Los avatares ya no viven en Vercel Blob sino detrás de `src/lib/storage/`, con un adaptador
+S3-compatible que hoy apunta a Cloudflare R2 (bucket `moon-media`) y mañana puede apuntar a
+MinIO cambiando las cinco variables `STORAGE_*`, sin tocar código de dominio.
+
+El archivo **no pasa por el servidor**: el cliente pide una URL PUT firmada a `/api/avatar`
+y sube directo. Es obligatorio, no una optimización — `bodySizeLimit` es 2mb y el avatar
+admite 4MB. El `ContentLength` va dentro de la firma, así que el storage rechaza con 403
+cualquier PUT que traiga más bytes de los declarados.
+
+`keyPerteneceAUsuario()` (`src/lib/storage/avatar-key.ts`) es una regla de seguridad, no una
+validación cosmética: las URLs de avatar son públicas y viajan en el HTML de cualquier
+perfil, así que sin ella alguien podía guardarse la URL ajena y disparar el borrado del
+archivo de otra persona. Se comprueba al guardar **y** al borrar.
+
+Si agregas portadas de libros al bucket, van con otro prefijo (`covers/`) y **no** con esta
+regla: una portada no tiene dueño, es del catálogo, y su permiso es admin o moderador.
 
 ## Testing
 

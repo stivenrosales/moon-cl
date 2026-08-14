@@ -31,7 +31,10 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    # 17 para igualar producción: Neon corre 17.10 y el Postgres del VPS se
+    # creó en 17 por eso mismo. Si acá corriera 16, un dump de producción no
+    # restauraría en local y el entorno de desarrollo mentiría.
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: moon
       POSTGRES_PASSWORD: moon

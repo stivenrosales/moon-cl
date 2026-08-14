@@ -219,6 +219,7 @@ export default async function BookPage({
                   pageCount: book.pageCount,
                   publishedYear: book.publishedYear,
                   isbn: book.isbn,
+                  publisher: book.publisher,
                 }}
               />
             ) : null}
@@ -270,6 +271,7 @@ export default async function BookPage({
                     pageCount: book.pageCount,
                     publishedYear: book.publishedYear,
                     isbn: book.isbn,
+                    publisher: book.publisher,
                   }}
                 />
               ) : null}

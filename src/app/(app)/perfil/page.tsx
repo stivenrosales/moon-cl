@@ -179,7 +179,12 @@ export default async function PerfilPage() {
           {user.bio ? <p className="text-sm text-foreground/90 leading-relaxed">{user.bio}</p> : null}
           {user.birthday ? (
             <p className="text-xs text-muted-foreground">
-              🎂 {formatDate(user.birthday, { year: undefined })}
+              {/* timeZone UTC porque birthday es @db.Date: una fecha de
+                  calendario, no un instante. Prisma la entrega como
+                  medianoche UTC, así que formatearla en la zona del entorno
+                  la retrasa un día en cualquier offset negativo. Hoy el
+                  contenedor corre en UTC y se ve bien por casualidad. */}
+              🎂 {formatDate(user.birthday, { year: undefined, timeZone: "UTC" })}
             </p>
           ) : null}
         </section>

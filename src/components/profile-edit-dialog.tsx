@@ -19,14 +19,17 @@ import { Select } from "@/components/ui/select";
 import { Label, Field, FieldDescription } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GENEROS } from "@/lib/genres";
+import { nombresDeMeses } from "@/lib/months";
 import { cn, getInitials } from "@/lib/utils";
 import { setAvatar, updateProfile } from "@/server/actions/profile";
 import { toggleMatchOptIn } from "@/server/actions/match";
 
 const MAX_GENRES = 10;
-const MONTHS = Array.from({ length: 12 }, (_, i) =>
-  new Intl.DateTimeFormat("es-ES", { month: "long" }).format(new Date(Date.UTC(2000, i, 1))),
-);
+// El índice de cada etiqueta ES el mes que se guarda (`<option value={i}>`
+// alimenta el Date.UTC de handleSubmit), así que la lista tiene que armarse
+// en UTC. Ver src/lib/months.ts: hacerlo en la zona del navegador la corría
+// un lugar y elegir "Marzo" guardaba abril.
+const MONTHS = nombresDeMeses();
 
 function daysInMonth(monthIndex: number) {
   return new Date(Date.UTC(2000, monthIndex + 1, 0)).getUTCDate();

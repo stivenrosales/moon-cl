@@ -50,7 +50,7 @@ export function RsvpButtons({ meetingId, initial }: RsvpButtonsProps) {
             variant={active ? "default" : "ghost"}
             onClick={() => choose(status)}
             disabled={pending !== null}
-            className={cn("rounded-full", active && status === "YES" && "bg-emerald-500 text-white hover:bg-emerald-500/90 shadow-none")}
+            className={cn("min-h-11 rounded-full", active && status === "YES" && "bg-emerald-500 text-white hover:bg-emerald-500/90 shadow-none")}
           >
             {pending === status ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

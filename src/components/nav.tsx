@@ -65,7 +65,10 @@ export function Nav({ user, unreadCount = 0 }: NavProps) {
           href={routes.mensajes()}
           aria-label={unreadCount > 0 ? `Mensajes, ${unreadCount} sin leer` : "Mensajes"}
           className={cn(
-            "relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors focus-ring",
+            // h-11 (44px) y no h-10: acá el target se toca con el dedo. Cabe
+            // en la barra de h-12 con 2px de aire arriba y abajo. El gemelo
+            // de escritorio (más abajo) se queda en h-10 a propósito: mouse.
+            "relative inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors focus-ring",
             mensajesActive
               ? "bg-primary/15 text-foreground"
               : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

@@ -53,7 +53,7 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1.5 opacity-70 transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
+      <DialogPrimitive.Close className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full opacity-70 transition-opacity hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
         <X className="h-4 w-4" />
         <span className="sr-only">Cerrar</span>
       </DialogPrimitive.Close>
@@ -66,9 +66,10 @@ const DialogHeader = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  // pr-8 reserva el carril del botón de cerrar (right-4 + su propio ancho)
-  // para que el título nunca lo pise, línea por línea, incluso envuelto.
-  <div className={cn("flex flex-col gap-1.5 text-left pr-8", className)} {...props} />
+  // pr-14 reserva el carril del botón de cerrar: su área táctil llega hasta
+  // right-2 (8px) + 44px de ancho = 52px del borde, así que 56px (pr-14) le
+  // da margen para que el título nunca la pise, línea por línea, incluso envuelto.
+  <div className={cn("flex flex-col gap-1.5 text-left pr-14", className)} {...props} />
 );
 
 const DialogFooter = ({

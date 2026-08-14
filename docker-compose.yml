@@ -1,0 +1,50 @@
+# Este compose es SOLO para desarrollo y verificación local del build de
+# Docker (por ejemplo, para probar que el standalone de Next arranca bien
+# antes de dejar que lo haga el workflow de CI).
+#
+# Producción NO usa este archivo. En el VPS con EasyPanel, Postgres es un
+# servicio separado de EasyPanel (`moon-postgres`), no un contenedor de este
+# compose — la app de producción solo recibe DATABASE_URL apuntando al host
+# interno de ese servicio. Levantar este compose en el VPS crearía una base
+# de datos duplicada y nada tendría que ver con la real.
+#
+# Uso: copiar .env.example a .env (con valores propios de AUTH_SECRET,
+# AUTH_RESEND_KEY, etc.) y correr `docker compose up --build`. DATABASE_URL,
+# HOSTNAME y PORT se pisan abajo a propósito para apuntar siempre al
+# Postgres de este compose, sin importar qué diga el .env local.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://moon:moon@db:5432/moon?schema=public
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: moon
+      POSTGRES_PASSWORD: moon
+      POSTGRES_DB: moon
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moon -d moon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,37 @@
+# Dependencias: se instalan de cero dentro de la imagen con `npm ci`.
+node_modules
+
+# Build de Next: se genera dentro de la imagen, nunca se copia desde el host.
+.next
+out
+
+# Control de versiones y CI: no aportan nada al runtime de la imagen.
+.git
+.github
+
+# Entornos y secretos: jamás deben viajar horneados dentro de una imagen —
+# las variables reales las inyecta EasyPanel en runtime.
+#
+# El patrón es un comodín a propósito, no la lista de los archivos que hoy
+# existen: una lista se queda corta el día que alguien crea .env.staging o
+# .env.produccion, y ese día el secreto se hornea en una imagen que se
+# publica en un registry. Acá el default seguro es excluir de más.
+.env*
+
+# Tests: no corren dentro de la imagen. El gate (tsc + vitest) corre en el
+# workflow de CI antes de siquiera intentar el build de Docker.
+**/*.test.ts
+**/*.test.tsx
+coverage
+
+# Documentación: no aporta al runtime.
+*.md
+docs
+
+# Compose es solo para desarrollo local, no forma parte de la imagen.
+docker-compose.yml
+
+# Basura de editor / SO.
+.DS_Store
+.vscode
+.idea

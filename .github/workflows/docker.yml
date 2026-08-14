@@ -1,0 +1,74 @@
+name: docker
+
+# Solo push a main: cada commit que llega a main es candidato a desplegarse
+# en el VPS. El VPS nunca buildea — solo hace `pull` de lo que este workflow
+# publica en GHCR.
+on:
+  push:
+    branches: [main]
+
+# El job de build necesita permiso para publicar paquetes (la imagen) en
+# GHCR usando el propio GITHUB_TOKEN, sin secretos adicionales.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # Gate real de este repo: npm run lint está roto (no hay config de ESLint
+  # y `next lint` se cuelga pidiendo crear una interactivamente), así que NO
+  # se ejecuta acá. tsc --noEmit + vitest son los que de verdad protegen main.
+  gate:
+    name: tsc + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Chequeo de tipos
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+  build-and-push:
+    name: build + push a GHCR
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Arma los tags (sha corto + latest) y el nombre de la imagen en
+      # minúsculas: GHCR rechaza nombres con mayúsculas y el owner de un repo
+      # de GitHub puede tenerlas.
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache de capas en GitHub Actions: builds siguientes no repiten
+          # `npm ci` ni `next build` desde cero si nada relevante cambió.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

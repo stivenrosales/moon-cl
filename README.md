@@ -211,15 +211,29 @@ endpoint único y se auto-descartan por fecha si no les toca. Va autenticado con
 
 ## 🎨 Paleta y tipografías
 
-- **Modo oscuro**: midnight aubergine `#11091F` · lavanda viva · crema pergamino para texto · dorado deslucido para acentos.
-- **Modo claro**: pergamino crema `#F5EFE2` · aubergine profundo `#2A1740` · lavanda · dorado.
-- **Display**: Fraunces (variable, características editoriales).
-- **Body**: Karla.
-- **Hand-script**: Caveat (acentos manuscritos como en el logo).
+Paleta **Wisteria × Lemon**. La fuente de verdad es `src/app/globals.css`.
 
-El detalle completo —tokens, escala tipográfica, elevación, motion y anti-patterns— está en
-[`DESIGN.md`](DESIGN.md). El contexto de producto (usuarias, tono, anti-referencias) en
-[`PRODUCT.md`](PRODUCT.md).
+| Token | Claro | Oscuro |
+|---|---|---|
+| `--background` | `#FAF8FD` blanco lila | `#140E1E` noche wisteria |
+| `--foreground` | `#261D3A` tinta wisteria | `#F3EEF9` |
+| `--primary` | `#7B4E93` wisteria profunda (AA) | `#C69FD5` wisteria |
+| `--accent` | `#F5E96E` lemon | `#FDFDC9` lemon (solo señal) |
+| `--accent-text` | `#7B4E93` | `#FDFDC9` |
+
+`--accent-text` existe porque el lemon no contrasta contra fondo claro: los kickers y el
+texto de acento usan wisteria en modo claro y lemon en oscuro. Para fills (badges, botones)
+va `--accent` directo. La clase `.gold-shimmer` conserva el nombre por historia, pero ya
+anima sobre `--accent`, o sea lemon.
+
+Tipografías: **Fraunces** display (variable, ejes editoriales) · **Karla** body ·
+**Caveat** hand-script (wordmark y aforismos, nunca body).
+
+> ⚠️ `DESIGN.md` documenta la paleta **anterior** al rebrand (aubergine + lavanda + dorado
+> `#D4B770`) y su inventario de componentes está incompleto. Sus reglas de tipografía,
+> espaciado, elevación y motion siguen vigentes; la tabla de color, no. Ver
+> [`DESIGN.md`](DESIGN.md) con ese filtro y [`PRODUCT.md`](PRODUCT.md) para el contexto de
+> producto (usuarias, tono, anti-referencias).
 
 ## 📝 Licencia
 

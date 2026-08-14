@@ -1,27 +1,54 @@
 # 🌙 Moon · Club de Lectura
 
-Aplicación premium para gestionar el club de lectura **Moon**: sugerencias de libros, votación múltiple, libro en curso, comentarios con hilos y spoilers ocultables, valoraciones, avance de lectura grupal y reuniones con RSVP.
+Aplicación premium para gestionar el club de lectura **Moon**: qué toca leer hoy, avance
+compartido, foro por salas sin spoilers, votaciones, reuniones con RSVP, mensajería entre
+miembras y trivia del club.
 
 ## ✨ Funcionalidades
 
+La app se organiza en **cinco destinos**, uno por trabajo que la usuaria viene a hacer.
+
+**Hoy** — la pantalla de entrada. Card héroe con el libro que estás leyendo (o el del club)
+y su avance en un toque, racha de días leídos, aviso de quién va más adelante y cuántos
+comentarios nuevos hay en tus salas abiertas. Debajo, una fila de urgencia con lo que tiene
+fecha límite (ronda por cerrar, próxima reunión) y, si no hay nada urgente, una recomendación
+de tu lista de pendientes.
+
+**Leer** — tu biblioteca y la del club. Estanterías personales (leyendo / quiero leer /
+terminado), marca de página y capítulo, valoraciones de 1–5 estrellas con reseña, citas
+compartidas y la ficha completa de cada libro.
+
+**Club** — la vida social. Feed de actividad, directorio de personas con seguimiento,
+muro de frases, mensajería directa y perfiles públicos.
+
+**Agenda** — todo lo que tiene fecha. Reuniones (presenciales o virtuales) con RSVP y
+descarga `.ics`, rondas de votación con sugerencias autocompletadas desde Google Books, y
+el ranking de trivia (Kahoot).
+
+**Perfil** — tu cuenta, avatar, géneros favoritos e historial.
+
+Transversal a todo:
+
 - **Auth sin contraseñas** — magic link por email (Resend o SMTP).
+- **Onboarding en 2 pasos** — nombre, confirmación de 18+ y géneros favoritos.
+- **Foro por salas sin spoilers** — los comentarios se abren por capítulo: si alguien
+  comenta el capítulo 12 y tú vas por el 5, ese contenido **no viaja al navegador**. Hay
+  además una sala de reflexión que solo se abre al terminar el libro.
+- **Invitaciones contextuales (nudges)** — una sola a la vez, descartable, que acompaña el
+  primer avance, la primera valoración, el primer mensaje.
+- **Book Match semanal** — empareja lectoras por afinidad los lunes (opt-in).
+- **Moderación** — reportes por categoría, bloqueo entre usuarias, panel de admin.
 - **Roles** — admin / moderador / miembro. Admins iniciales por env var.
-- **Rondas de votación** — el admin abre rondas con fechas; los miembros sugieren libros (autocompletado con Google Books) y votan a los que quieran. Al cerrar, el más votado se elige automáticamente.
-- **Libro en curso** — el ganador (o cualquier libro elegido por el admin) se promueve a libro del club.
-- **Avance de lectura** — cada miembro marca su página actual; la app calcula el % y muestra panel grupal.
-- **Comentarios** — con hilos de un nivel, marca de spoiler ocultable y capítulo opcional para evitar arruinar a quien va más atrás.
-- **Valoraciones** — 1–5 estrellas + reseña, una por miembro por libro.
-- **Reuniones** — fecha, lugar físico o enlace virtual, descripción y RSVP (sí / quizás / no).
-- **Biblioteca histórica** — todos los libros del club con su estado.
-- **Modo claro y oscuro** — premium "editorial cósmico" con paleta lavanda + crema pergamino + dorado deslucido.
+- **Modo claro y oscuro** — "editorial cósmico": lavanda + crema pergamino + dorado deslucido.
 
 ## 🧱 Stack
 
-- **Next.js 15** (App Router) + TypeScript
-- **NextAuth v5 (Auth.js)** con provider Resend / Nodemailer
-- **PostgreSQL** (recomendado: [Neon](https://neon.tech))
-- **Prisma ORM**
-- **Tailwind CSS** + componentes propios (Radix UI primitives)
+- **Next.js 15** (App Router) + React 18 + TypeScript
+- **NextAuth v5 (Auth.js)** con provider Resend / Nodemailer, sesión con estrategia *database*
+- **PostgreSQL** (recomendado: [Neon](https://neon.tech)) + **Prisma ORM**
+- **Tailwind CSS** + primitivos propios sobre Radix UI
+- **SWR** para el polling del hilo de mensajes · **Vercel Blob** para avatares · **ics** para calendario
+- **Vitest** para tests (620 tests, entorno node)
 - **Fuentes**: Fraunces (display) · Karla (sans) · Caveat (hand-script) — vía `next/font`
 - **Sonner** para notificaciones, **Framer Motion** para microinteracciones
 
@@ -35,13 +62,7 @@ npm install
 
 ### 2. Configura variables de entorno
 
-Copia `.env.example` a `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Completa al menos:
+Copia `.env.example` a `.env` y completa al menos:
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/dbname?sslmode=require"
@@ -52,7 +73,20 @@ EMAIL_FROM="Moon Club <noreply@tudominio.com>"
 ADMIN_EMAILS="tu@email.com,otroadmin@email.com"
 ```
 
-> En desarrollo, si no configuras `AUTH_RESEND_KEY` ni SMTP, los magic links se imprimen en la consola del servidor.
+Opcionales, según la funcionalidad que necesites:
+
+| Variable | Para qué | Sin ella |
+|---|---|---|
+| `GOOGLE_BOOKS_API_KEY` | autocompletado de libros | funciona, con rate limit |
+| `CRON_SECRET` | autentica `/api/cron/daily` | el endpoint responde 500 |
+| `BLOB_READ_WRITE_TOKEN` | subida de avatares a Vercel Blob | el upload falla |
+
+> `CRON_SECRET` y `BLOB_READ_WRITE_TOKEN` **no están todavía en `.env.example`** — agrégalas
+> a mano si vas a tocar cron o avatares. Vercel inyecta `BLOB_READ_WRITE_TOKEN` solo, al
+> crear el store.
+
+> En desarrollo, si no configuras `AUTH_RESEND_KEY` ni SMTP, los magic links se imprimen en
+> la consola del servidor.
 
 ### 3. Crea las tablas en la base de datos
 
@@ -60,7 +94,7 @@ ADMIN_EMAILS="tu@email.com,otroadmin@email.com"
 npx prisma db push
 ```
 
-### 4. Levanta el servidor de desarrollo
+### 4. Levanta el servidor
 
 ```bash
 npm run dev
@@ -70,81 +104,110 @@ Abre <http://localhost:3000>.
 
 ### 5. Conviértete en admin
 
-Asegúrate de que tu email esté en `ADMIN_EMAILS` antes de iniciar sesión por primera vez. Al crear tu cuenta, se promoverá automáticamente a `ADMIN`.
-
-## 🌍 Despliegue (Vercel + Neon + Resend)
-
-1. Crea un proyecto en [Neon](https://neon.tech) y copia el `DATABASE_URL` con `?sslmode=require`.
-2. Crea una API key en [Resend](https://resend.com) y verifica un dominio para enviar correos en producción.
-3. Sube el repo a GitHub y conéctalo a [Vercel](https://vercel.com).
-4. En la configuración de Vercel, añade las mismas variables del `.env`.
-5. Deploy.
-
-Tras el deploy, ejecuta una vez `npx prisma db push` apuntando a la `DATABASE_URL` de producción para crear las tablas.
+Asegúrate de que tu email esté en `ADMIN_EMAILS` **antes** de iniciar sesión por primera vez.
+Al crear tu cuenta, se promoverá automáticamente a `ADMIN`.
 
 ## 📂 Estructura
 
 ```
 src/
 ├── app/
-│   ├── (app)/                # Rutas protegidas (auth requerida)
-│   │   ├── dashboard/        # Inicio: libro en curso + ronda + reunión
-│   │   ├── rondas/           # Listado y detalle de rondas
-│   │   ├── libros/[id]/      # Página completa de libro
-│   │   ├── biblioteca/       # Histórico de libros
-│   │   ├── reuniones/        # Reuniones + RSVP
-│   │   ├── perfil/           # Perfil del usuario
-│   │   └── admin/            # Panel admin
-│   ├── api/auth/             # NextAuth handlers
-│   ├── login/                # Magic link
-│   ├── page.tsx              # Landing pública
-│   ├── layout.tsx            # Root layout (fuentes, theme provider, starfield)
-│   └── globals.css           # Tema editorial cósmico
+│   ├── (app)/                    # Rutas protegidas (requieren auth + onboarding)
+│   │   ├── hoy/                  # Héroe + fila de urgencia + nudge
+│   │   ├── leer/                 # ?vista=mios|club · libro/[id]
+│   │   ├── club/                 # ?vista=actividad|personas|frases
+│   │   │   ├── mensajes/         # bandeja · [userId] = hilo
+│   │   │   └── persona/[id]/     # perfil público
+│   │   ├── agenda/               # ?vista=reuniones|votaciones|trivia
+│   │   │   ├── reunion/[id]/
+│   │   │   └── ronda/[id]/
+│   │   ├── perfil/ · admin/
+│   │   └── layout.tsx            # guard de sesión + onboarding, nav, tab bar
+│   ├── api/
+│   │   ├── auth/[...nextauth]/
+│   │   ├── avatar/               # upload a Vercel Blob
+│   │   ├── cron/daily/           # dispatcher único de todos los jobs
+│   │   ├── mensajes/[userId]/    # polling SWR del hilo
+│   │   └── reuniones/[id]/ics/   # descarga de calendario
+│   ├── login/ · onboarding/      # fuera de (app): evitan loop de redirect
+│   ├── page.tsx                  # landing pública
+│   └── layout.tsx · globals.css
 ├── components/
-│   ├── ui/                   # Primitivos (Button, Input, Card…)
-│   ├── admin/                # Formularios y acciones del panel admin
-│   ├── moon-logo.tsx         # Logo SVG (luna + gato + libro + estrellas)
-│   ├── starfield.tsx         # Atmósfera nocturna
-│   ├── nav.tsx               # Navegación principal
-│   ├── book-search.tsx       # Autocomplete Google Books
-│   ├── comments-section.tsx  # Hilos + spoilers
-│   ├── progress-form.tsx     # Avance de lectura
-│   ├── rating-form.tsx       # Valoración + reseña
-│   ├── rsvp-buttons.tsx      # Confirmación de asistencia
-│   └── …
-├── lib/
-│   ├── auth.ts               # NextAuth config
-│   ├── db.ts                 # Cliente Prisma
-│   ├── email.ts              # Plantilla del magic link
-│   ├── google-books.ts       # Wrapper de la API
-│   ├── permissions.ts        # Helpers de roles
-│   ├── utils.ts              # cn(), fechas, iniciales, %…
-│   └── validators.ts         # Esquemas Zod
+│   ├── ui/                       # primitivos (button, card, dialog, select…)
+│   ├── admin/                    # formularios del panel
+│   └── …                         # composiciones (hero-card, nudge-card, …)
+├── lib/                          # puro y compartible
+│   ├── routes.ts                 # fuente única de rutas — no escribas paths literales
+│   ├── legacy-redirects.ts       # redirects 307 de las rutas viejas
+│   ├── validators.ts             # esquemas Zod
+│   ├── auth.ts · session.ts · db.ts · permissions.ts · utils.ts
+│   └── …                         # lógica extraída de componentes, para testearla
 └── server/
-    ├── auth-helpers.ts       # requireUser/requireAdmin/…
-    └── actions/              # Server actions tipadas
-        ├── rounds.ts
-        ├── suggestions.ts
-        ├── votes.ts
-        ├── books.ts
-        ├── comments.ts
-        ├── ratings.ts
-        ├── progress.ts
-        ├── meetings.ts
-        └── admin.ts
+    ├── actions/                  # "use server" — única puerta de escritura
+    ├── services/                 # lecturas + reglas (patrón función pura + loader)
+    ├── jobs/                     # tareas del cron diario
+    └── auth-helpers.ts           # requireUser / requireAdmin / requireModerator
 ```
+
+Las rutas se reestructuraron de 8 pestañas a estos 5 destinos. **Las URLs viejas siguen
+funcionando** como redirects 307 declarados en `src/lib/legacy-redirects.ts`.
 
 ## 🧪 Scripts
 
 ```bash
-npm run dev          # servidor de desarrollo
-npm run build        # build de producción (incluye prisma generate)
-npm run start        # servidor de producción
-npm run lint         # ESLint
-npm run db:push      # aplica el schema a la BD (sin migraciones)
-npm run db:migrate   # crea migración en dev
-npm run db:studio    # explora la BD en el navegador
+npm run dev              # servidor de desarrollo
+npm test                 # vitest run — 620 tests en ~3s
+npm run test:watch       # vitest en watch
+npx tsc --noEmit         # chequeo de tipos
+npm run build            # build de producción (prisma generate + next build)
+npm run start            # servidor de producción
+npm run db:push          # aplica el schema a la BD (sin migraciones)
+npm run db:studio        # explora la BD en el navegador
+npm run db:seed          # datos de ejemplo
+npm run db:backfill-nudges
 ```
+
+Para correr un test suelto:
+
+```bash
+npx vitest run src/server/services/today.test.ts
+npx vitest run -t "no deja votar en una ronda que no está OPEN"
+```
+
+> ⚠️ **`npm run lint` no funciona.** No hay config de ESLint en el repo y `next lint` está
+> deprecado en Next 15.5: el comando se cuelga pidiendo crear la configuración de forma
+> interactiva. La verificación del proyecto es `npx tsc --noEmit` + `npm test`.
+
+## 🗄️ Base de datos
+
+**No hay carpeta `prisma/migrations/`**: el schema se aplica con `prisma db push` corrido a
+mano. El build de Vercel (`prisma generate && next build`) **no toca la base de datos**, así
+que un cambio de schema sin `db push` contra producción deja el deploy desincronizado.
+
+Regla corta: escribe el cambio como aditivo, aplícalo a producción **antes** de deployar el
+código que lo usa, y parte cualquier cambio destructivo en dos deploys. El runbook completo
+—incluido cómo adoptar `prisma migrate` con un baseline— está en
+[`docs/MIGRATIONS.md`](docs/MIGRATIONS.md).
+
+## 🌍 Despliegue (Vercel + Neon + Resend)
+
+1. Crea un proyecto en [Neon](https://neon.tech) y copia el `DATABASE_URL` con `?sslmode=require`.
+2. Crea una API key en [Resend](https://resend.com) y verifica un dominio para producción.
+3. Crea un store de **Vercel Blob** si quieres avatares (inyecta `BLOB_READ_WRITE_TOKEN`).
+4. Sube el repo a GitHub y conéctalo a [Vercel](https://vercel.com).
+5. Añade las variables del `.env` en la configuración de Vercel, incluida `CRON_SECRET`.
+6. Deploy.
+
+Tras el deploy, ejecuta una vez `npx prisma db push` apuntando a la `DATABASE_URL` de
+producción para crear las tablas.
+
+### Cron
+
+`vercel.json` declara **un solo cron**: `/api/cron/daily` a las 12:00 UTC. Vercel Hobby
+permite máximo 2 crons con una ejecución diaria, así que todos los jobs (cierre de rondas
+vencidas, recordatorios de reuniones, saludos de cumpleaños, Book Match) cuelgan de ese
+endpoint único y se auto-descartan por fecha si no les toca. Va autenticado con
+`Authorization: Bearer $CRON_SECRET`.
 
 ## 🎨 Paleta y tipografías
 
@@ -153,6 +216,10 @@ npm run db:studio    # explora la BD en el navegador
 - **Display**: Fraunces (variable, características editoriales).
 - **Body**: Karla.
 - **Hand-script**: Caveat (acentos manuscritos como en el logo).
+
+El detalle completo —tokens, escala tipográfica, elevación, motion y anti-patterns— está en
+[`DESIGN.md`](DESIGN.md). El contexto de producto (usuarias, tono, anti-referencias) en
+[`PRODUCT.md`](PRODUCT.md).
 
 ## 📝 Licencia
 

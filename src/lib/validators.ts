@@ -112,6 +112,18 @@ export const profileUpdateSchema = z.object({
   favoriteGenres: z.array(z.enum(GENEROS)).max(10).optional().default([]),
 });
 
+// Body de POST /api/avatar. Solo valida FORMA (tipos, presencia): sin esto,
+// un `size` ausente llegaba como `undefined` y `undefined > MAX_BYTES` es
+// `false`, así que la validación de tamaño se colaba en silencio. Las
+// reglas de negocio de qué contentType/tamaño se aceptan viven en
+// validarArchivoAvatar (src/lib/storage/avatar-validation.ts), pura y
+// testeada aparte — acá solo garantizamos que el shape es el esperado.
+export const solicitudSubidaAvatarSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  contentType: z.string().min(1),
+  size: z.number().int().positive(),
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // Estanterías personales (Paquete E)
 // ─────────────────────────────────────────────────────────────────────────

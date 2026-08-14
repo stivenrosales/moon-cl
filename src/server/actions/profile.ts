@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { del } from "@vercel/blob";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { onboardingSchema, profileUpdateSchema } from "@/lib/validators";
 import { routes } from "@/lib/routes";
 import { requireUser } from "@/server/auth-helpers";
+import { extraerKeyDeUrl } from "@/lib/storage/public-url";
+import { keyPerteneceAUsuario } from "@/lib/storage/avatar-key";
+import { s3StorageAdapter } from "@/lib/storage/s3-adapter";
 
 // El paso 1 del onboarding también captura el nombre, pero onboardingSchema
 // (compartido en validators.ts) solo valida el consentimiento 18+ y los
@@ -54,6 +56,16 @@ export async function updateProfile(input: unknown) {
 export async function setAvatar(url: string) {
   const user = await requireUser();
   const parsedUrl = z.string().url().parse(url);
+  const publicUrlBase = process.env.STORAGE_PUBLIC_URL;
+
+  // Las URLs de avatar son públicas y cualquiera las ve en el HTML de un
+  // perfil, así que el cliente puede mandar acá la de otra persona. Si la
+  // URL cuelga de NUESTRO storage, la key tiene que ser suya; si no cuelga
+  // (avatar externo de OAuth) se deja pasar como siempre.
+  const keyNueva = publicUrlBase ? extraerKeyDeUrl(publicUrlBase, parsedUrl) : null;
+  if (keyNueva && !keyPerteneceAUsuario(keyNueva, user.id)) {
+    throw new Error("Ese avatar no te pertenece");
+  }
 
   const previous = await db.user.findUnique({
     where: { id: user.id },
@@ -66,12 +78,17 @@ export async function setAvatar(url: string) {
   });
 
   if (previous?.image && previous.image !== parsedUrl) {
-    try {
-      await del(previous.image);
-    } catch {
-      // No-fatal: el avatar anterior puede no existir en Blob (p.ej. era
-      // una URL externa de OAuth) o ya haber sido borrado. No bloquea el
-      // guardado del nuevo avatar.
+    // extraerKeyDeUrl devuelve null si el avatar anterior no vive en
+    // nuestro storage (p.ej. una URL externa de OAuth de Google) — no hay
+    // key que borrar y eso no es un error. s3StorageAdapter.borrar() ya
+    // absorbe el caso de que el objeto tampoco exista en el bucket.
+    //
+    // La comprobación de pertenencia se repite acá a propósito: filas
+    // guardadas ANTES de que existiera la validación de arriba pueden
+    // apuntar al archivo de otra persona, y este borrado es irreversible.
+    const previousKey = publicUrlBase ? extraerKeyDeUrl(publicUrlBase, previous.image) : null;
+    if (previousKey && keyPerteneceAUsuario(previousKey, user.id)) {
+      await s3StorageAdapter.borrar(previousKey);
     }
   }
 

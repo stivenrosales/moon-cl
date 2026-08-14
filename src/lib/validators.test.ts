@@ -17,6 +17,7 @@ import {
   reportSchema,
   roundSchema,
   shelfStatusSchema,
+  solicitudSubidaAvatarSchema,
   updateMyBookSchema,
 } from "@/lib/validators";
 
@@ -602,6 +603,68 @@ describe("profileUpdateSchema", () => {
     const result = profileUpdateSchema.safeParse({
       name: "María Pérez",
       favoriteGenres: ["Manga"],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("solicitudSubidaAvatarSchema", () => {
+  it("acepta una solicitud válida", () => {
+    const result = solicitudSubidaAvatarSchema.safeParse({
+      fileName: "foto.png",
+      contentType: "image/png",
+      size: 1024,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza cuando falta size — antes esto se colaba porque `undefined > MAX` es false", () => {
+    const result = solicitudSubidaAvatarSchema.safeParse({
+      fileName: "foto.png",
+      contentType: "image/png",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un size que no es número (p.ej. viene como string desde un cliente malicioso)", () => {
+    const result = solicitudSubidaAvatarSchema.safeParse({
+      fileName: "foto.png",
+      contentType: "image/png",
+      size: "1024",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un size negativo o cero", () => {
+    expect(
+      solicitudSubidaAvatarSchema.safeParse({
+        fileName: "foto.png",
+        contentType: "image/png",
+        size: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      solicitudSubidaAvatarSchema.safeParse({
+        fileName: "foto.png",
+        contentType: "image/png",
+        size: -1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rechaza fileName vacío", () => {
+    const result = solicitudSubidaAvatarSchema.safeParse({
+      fileName: "",
+      contentType: "image/png",
+      size: 1024,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta contentType", () => {
+    const result = solicitudSubidaAvatarSchema.safeParse({
+      fileName: "foto.png",
+      size: 1024,
     });
     expect(result.success).toBe(false);
   });

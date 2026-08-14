@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { upload } from "@vercel/blob/client";
 import { Camera, Check, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -78,16 +77,36 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
   async function handleAvatarFile(file: File) {
     setUploadingAvatar(true);
     try {
-      const blob = await upload(`avatars/${user.id}-${Date.now()}-${file.name}`, file, {
-        access: "public",
-        handleUploadUrl: "/api/avatar",
+      // Subida en dos pasos: primero pedimos una URL firmada (el server
+      // valida tipo/tamaño y arma la key), después el archivo va directo
+      // al storage sin pasar por nuestro servidor — necesario porque un
+      // avatar de hasta 4MB no entra en el límite de 2MB de los server
+      // actions (experimental.serverActions.bodySizeLimit en next.config.ts).
+      const solicitud = await fetch("/api/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
       });
-      // El callback onUploadCompleted de /api/avatar no corre en localhost
-      // (Vercel Blob no puede llamar de vuelta a un webhook local), así que
-      // persistimos la URL explícitamente desde el cliente. En producción
-      // esto es redundante con el webhook pero no rompe nada (misma URL).
-      await setAvatar(blob.url);
-      setAvatarUrl(blob.url);
+      if (!solicitud.ok) {
+        const data = (await solicitud.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "No se pudo preparar la subida del avatar");
+      }
+      const { uploadUrl, publicUrl } = (await solicitud.json()) as {
+        uploadUrl: string;
+        publicUrl: string;
+      };
+
+      const subida = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!subida.ok) {
+        throw new Error("No se pudo subir el avatar al storage");
+      }
+
+      await setAvatar(publicUrl);
+      setAvatarUrl(publicUrl);
       toast.success("Avatar actualizado");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo subir el avatar";

@@ -13,6 +13,78 @@ export interface BookCandidate {
 const OL_ENDPOINT = "https://openlibrary.org/search.json";
 const GB_ENDPOINT = "https://www.googleapis.com/books/v1/volumes";
 
+// Límites espejo de bookInputSchema (src/lib/validators.ts). Si allá cambian,
+// acá también: este archivo es el borde por donde entran los datos externos.
+const MAX_TITULO = 280;
+const MAX_AUTOR = 120;
+const MAX_DESCRIPCION = 8000;
+const MAX_ISBN = 20;
+const MAX_ID_EXTERNO = 60;
+const MAX_PAGINAS = 20000;
+const MAX_ANIO = 2100;
+
+/**
+ * Ajusta un candidato crudo a lo que exige bookInputSchema.
+ *
+ * Google Books y Open Library devuelven registros incompletos y sucios con
+ * total normalidad: pageCount 0 en los volúmenes sin portada, descripciones
+ * de más de 8000 caracteres, ISBN concatenados, coverUrl vacía. Nada de eso
+ * pasa el schema, y como las TRES puertas de entrada de libros —crear desde
+ * /admin, agregar a la estantería y sugerir en una ronda— parsean con él, un
+ * candidato sucio hacía lanzar la action y la usuaria solo veía el error
+ * genérico de producción, sin ninguna pista.
+ *
+ * El saneo va acá, en el borde, y no relajando el schema: bajarle las
+ * exigencias al schema sería aceptar basura dentro de la base para siempre.
+ */
+export function sanearCandidato(raw: BookCandidate): BookCandidate {
+  return {
+    googleBooksId: raw.googleBooksId.slice(0, MAX_ID_EXTERNO),
+    title: raw.title.trim().slice(0, MAX_TITULO),
+    authors: raw.authors
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .map((a) => a.slice(0, MAX_AUTOR)),
+    coverUrl: urlHttpValida(raw.coverUrl),
+    description: textoAcotado(raw.description, MAX_DESCRIPCION),
+    // 0 páginas no es un dato, es ausencia de dato: por eso colapsa a null.
+    // Ojo, NO es el caso de currentPage en el progreso de lectura, donde la
+    // página 0 sí es un valor legítimo y distinto de "nunca marcó avance".
+    pageCount: enteroEnRango(raw.pageCount, 1, MAX_PAGINAS),
+    publishedYear: enteroEnRango(raw.publishedYear, 0, MAX_ANIO),
+    // Un ISBN recortado sería un identificador falso, así que se descarta
+    // entero en vez de truncarlo.
+    isbn: textoAcotado(raw.isbn, MAX_ISBN, { descartarSiExcede: true }),
+  };
+}
+
+function urlHttpValida(valor: string | null): string | null {
+  if (!valor) return null;
+  try {
+    const { protocol } = new URL(valor);
+    return protocol === "https:" || protocol === "http:" ? valor : null;
+  } catch {
+    return null;
+  }
+}
+
+function textoAcotado(
+  valor: string | null,
+  max: number,
+  opts: { descartarSiExcede?: boolean } = {},
+): string | null {
+  if (!valor) return null;
+  const limpio = valor.trim();
+  if (!limpio) return null;
+  if (limpio.length <= max) return limpio;
+  return opts.descartarSiExcede ? null : limpio.slice(0, max);
+}
+
+function enteroEnRango(valor: number | null, min: number, max: number): number | null {
+  if (valor == null || !Number.isInteger(valor) || valor < min || valor > max) return null;
+  return valor;
+}
+
 /**
  * Busca libros combinando Google Books y Open Library.
  * Prioriza Google Books (metadata más rica y limpia) y rellena con Open
@@ -111,7 +183,7 @@ async function searchGoogleBooks(query: string, max: number): Promise<BookCandid
       const cover = pickGoogleCover(item.id, v.imageLinks);
       const year = v.publishedDate ? Number(v.publishedDate.slice(0, 4)) : null;
 
-      return {
+      return sanearCandidato({
         googleBooksId: `gb:${item.id}`,
         title: [v.title, v.subtitle].filter(Boolean).join(": "),
         authors: cleanAuthors(v.authors ?? []),
@@ -120,7 +192,7 @@ async function searchGoogleBooks(query: string, max: number): Promise<BookCandid
         pageCount: v.pageCount ?? null,
         publishedYear: Number.isFinite(year) ? (year as number) : null,
         isbn,
-      };
+      });
     });
 }
 
@@ -174,7 +246,7 @@ async function searchOpenLibrary(query: string, max: number): Promise<BookCandid
 
   return data.docs
     .filter((d) => d.title)
-    .map<BookCandidate>((d) => ({
+    .map<BookCandidate>((d) => sanearCandidato({
       googleBooksId: `ol:${d.key.replace(/^\/works\//, "")}`,
       title: d.title!,
       authors: cleanAuthors(d.author_name ?? []),

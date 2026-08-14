@@ -82,3 +82,22 @@ jobs:
           # `npm ci` ni `next build` desde cero si nada relevante cambió.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Sin esto la imagen se publica y ahí se queda: EasyPanel no vigila el
+      # registry, hay que avisarle. El webhook dispara un pull de :latest y
+      # reemplaza el contenedor.
+      #
+      # La URL COMPLETA es la credencial (lleva el token del servicio
+      # embebido), por eso va entera en el secret y no se compone acá: un
+      # token suelto en el YAML terminaría en los logs del run.
+      #
+      # continue-on-error a propósito: si el webhook falla, la imagen ya está
+      # publicada y correcta. Marcar el build entero como rojo por un fallo
+      # de despliegue haría creer que el código está mal cuando no lo está.
+      - name: Avisar a EasyPanel que haga pull
+        continue-on-error: true
+        run: |
+          codigo=$(curl -sS -o /dev/null -w "%{http_code}" -m 60 \
+            -X POST "${{ secrets.EASYPANEL_DEPLOY_HOOK }}")
+          echo "EasyPanel respondió HTTP $codigo"
+          [ "$codigo" = "200" ] || exit 1

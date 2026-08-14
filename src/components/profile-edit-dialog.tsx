@@ -47,6 +47,46 @@ interface ProfileEditDialogProps {
 
 export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
   const [open, setOpen] = React.useState(false);
+  // Contador de aperturas: es la key del formulario, así que abrir el
+  // diálogo lo REMONTA y su estado vuelve a derivarse de `user`. Antes el
+  // estado vivía acá, en un componente que no se desmonta nunca: lo que
+  // tocabas y cerrabas SIN guardar sobrevivía para siempre, y el select de
+  // cumpleaños quedaba mostrando un mes que la base nunca tuvo mientras el
+  // perfil, dos centímetros más abajo, pintaba el valor real.
+  //
+  // No alcanza con que Radix desmonte DialogContent al cerrar: durante la
+  // animación de salida sigue montado, y reabrir dentro de esa ventana
+  // reusaría la instancia vieja.
+  const [aperturas, setAperturas] = React.useState(0);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(siguiente) => {
+        if (siguiente) setAperturas((n) => n + 1);
+        setOpen(siguiente);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil className="h-3.5 w-3.5" />
+          Editar perfil
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <ProfileEditForm key={aperturas} user={user} onClose={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProfileEditForm({
+  user,
+  onClose,
+}: {
+  user: ProfileEditDialogProps["user"];
+  onClose: () => void;
+}) {
   const [avatarUrl, setAvatarUrl] = React.useState(user.image ?? "");
   const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
   const [name, setName] = React.useState(user.name ?? "");
@@ -145,7 +185,7 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
         favoriteGenres: genres,
       });
       toast.success("Perfil actualizado");
-      setOpen(false);
+      onClose();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo guardar";
       toast.error(msg);
@@ -155,185 +195,177 @@ export function ProfileEditDialog({ user }: ProfileEditDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Pencil className="h-3.5 w-3.5" />
-          Editar perfil
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Editar perfil</DialogTitle>
-          <DialogDescription>
-            Actualiza tu avatar, nombre, bio, cumpleaños y géneros favoritos.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Editar perfil</DialogTitle>
+        <DialogDescription>
+          Actualiza tu avatar, nombre, bio, cumpleaños y géneros favoritos.
+        </DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-5">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="text-lg">
-                {getInitials(name, user.email)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleAvatarFile(file);
-                  e.target.value = "";
-                }}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="self-start"
-                disabled={uploadingAvatar}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {uploadingAvatar ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Camera className="h-3.5 w-3.5" />
-                )}
-                Cambiar avatar
-              </Button>
-              <FieldDescription>JPG, PNG o WEBP, máx. 4MB.</FieldDescription>
-            </div>
-          </div>
-
-          <Field>
-            <Label htmlFor="name" required>Nombre</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-          </Field>
-
-          <Field>
-            <Label htmlFor="bio" optional>Bio</Label>
-            <Textarea
-              id="bio"
-              rows={3}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              maxLength={280}
-              placeholder="Cuéntanos un poco de ti…"
+      <div className="space-y-5">
+        <div className="flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+            <AvatarFallback className="text-lg">
+              {getInitials(name, user.email)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleAvatarFile(file);
+                e.target.value = "";
+              }}
             />
-          </Field>
-
-          <Field>
-            <Label optional>Cumpleaños</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                aria-label="Día"
-                value={day}
-                onChange={(e) => setDay(e.target.value)}
-              >
-                <option value="">Día</option>
-                {Array.from({ length: availableDays }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                aria-label="Mes"
-                value={month}
-                onChange={(e) => {
-                  const nextMonth = e.target.value;
-                  setMonth(nextMonth);
-                  if (nextMonth !== "" && Number(day) > daysInMonth(Number(nextMonth))) {
-                    setDay("");
-                  }
-                }}
-              >
-                <option value="">Mes</option>
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>
-                    {m.charAt(0).toUpperCase() + m.slice(1)}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <FieldDescription>Solo día y mes — no pedimos el año.</FieldDescription>
-          </Field>
-
-          <Field>
-            <Label optional>Géneros favoritos</Label>
-            <div className="flex flex-wrap gap-2">
-              {GENEROS.map((genre) => {
-                const selected = genres.includes(genre);
-                return (
-                  <button
-                    key={genre}
-                    type="button"
-                    onClick={() => toggleGenre(genre)}
-                    aria-pressed={selected}
-                    className={cn(
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-ring",
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
-                    )}
-                  >
-                    {genre}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-
-          <Field>
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 px-3.5 py-3">
-              <div className="space-y-0.5">
-                <Label>Book Match semanal</Label>
-                <FieldDescription>
-                  Cada lunes te presentamos a alguien del club con quien compartes gustos de lectura, con un
-                  correo para romper el hielo. Es opcional — puedes desactivarlo cuando quieras.
-                </FieldDescription>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={matchOptIn}
-                aria-label="Book Match semanal"
-                disabled={matchToggling}
-                onClick={handleToggleMatch}
-                className={cn(
-                  "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors focus-ring disabled:opacity-50",
-                  matchOptIn ? "border-primary bg-primary" : "border-border bg-muted",
-                )}
-              >
-                <span
-                  className={cn(
-                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
-                    matchOptIn ? "translate-x-[18px]" : "translate-x-0.5",
-                  )}
-                />
-              </button>
-            </div>
-          </Field>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              disabled={uploadingAvatar}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploadingAvatar ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+              Cambiar avatar
+            </Button>
+            <FieldDescription>JPG, PNG o WEBP, máx. 4MB.</FieldDescription>
+          </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting || name.trim().length < 2}>
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
-            Guardar cambios
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Field>
+          <Label htmlFor="name" required>Nombre</Label>
+          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+        </Field>
+
+        <Field>
+          <Label htmlFor="bio" optional>Bio</Label>
+          <Textarea
+            id="bio"
+            rows={3}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            maxLength={280}
+            placeholder="Cuéntanos un poco de ti…"
+          />
+        </Field>
+
+        <Field>
+          <Label optional>Cumpleaños</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              aria-label="Día"
+              value={day}
+              onChange={(e) => setDay(e.target.value)}
+            >
+              <option value="">Día</option>
+              {Array.from({ length: availableDays }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Mes"
+              value={month}
+              onChange={(e) => {
+                const nextMonth = e.target.value;
+                setMonth(nextMonth);
+                if (nextMonth !== "" && Number(day) > daysInMonth(Number(nextMonth))) {
+                  setDay("");
+                }
+              }}
+            >
+              <option value="">Mes</option>
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i}>
+                  {m.charAt(0).toUpperCase() + m.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <FieldDescription>Solo día y mes — no pedimos el año.</FieldDescription>
+        </Field>
+
+        <Field>
+          <Label optional>Géneros favoritos</Label>
+          <div className="flex flex-wrap gap-2">
+            {GENEROS.map((genre) => {
+              const selected = genres.includes(genre);
+              return (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => toggleGenre(genre)}
+                  aria-pressed={selected}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-ring",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                  )}
+                >
+                  {genre}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+
+        <Field>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 px-3.5 py-3">
+            <div className="space-y-0.5">
+              <Label>Book Match semanal</Label>
+              <FieldDescription>
+                Cada lunes te presentamos a alguien del club con quien compartes gustos de lectura, con un
+                correo para romper el hielo. Es opcional — puedes desactivarlo cuando quieras.
+              </FieldDescription>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={matchOptIn}
+              aria-label="Book Match semanal"
+              disabled={matchToggling}
+              onClick={handleToggleMatch}
+              className={cn(
+                "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors focus-ring disabled:opacity-50",
+                matchOptIn ? "border-primary bg-primary" : "border-border bg-muted",
+              )}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
+                  matchOptIn ? "translate-x-[18px]" : "translate-x-0.5",
+                )}
+              />
+            </button>
+          </div>
+        </Field>
+      </div>
+
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSubmit} disabled={submitting || name.trim().length < 2}>
+          {submitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+          Guardar cambios
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

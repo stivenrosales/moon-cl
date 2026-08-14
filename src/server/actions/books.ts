@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { searchBooks, type BookCandidate } from "@/lib/google-books";
 import { routes } from "@/lib/routes";
-import { bookInputSchema, bookUpdateSchema } from "@/lib/validators";
+import { bookUpdateSchema, createBookSchema } from "@/lib/validators";
 import { requireUser, requireModerator } from "@/server/auth-helpers";
+import { findOrCreateBook } from "@/server/services/books";
+import { setCurrentBookTx } from "@/server/services/club";
 
 export async function searchBooksAction(query: string): Promise<BookCandidate[]> {
   await requireUser();
@@ -35,27 +37,32 @@ export async function updateBookAction(input: unknown) {
   return updated;
 }
 
-export async function upsertBookFromInput(input: unknown) {
-  await requireUser();
-  const data = bookInputSchema.parse(input);
+/**
+ * Crea un libro directamente desde /admin (sin pasar por votación). Si
+ * marcarComoActual es true, crear el libro y dejarlo como lectura en curso
+ * del club van en UNA sola transacción: setCurrentBookTx no solo marca el
+ * nuevo libro como actual, también archiva el anterior como FINISHED. Con
+ * dos escrituras separadas, si la segunda fallara, el club quedaría sin
+ * lectura en curso y con un libro huérfano recién creado.
+ */
+export async function createBook(input: unknown): Promise<{ id: string; title: string }> {
+  await requireModerator();
+  const data = createBookSchema.parse(input);
 
-  if (data.googleBooksId) {
-    const existing = await db.book.findUnique({
-      where: { googleBooksId: data.googleBooksId },
-    });
-    if (existing) return existing;
+  const book = data.marcarComoActual
+    ? await db.$transaction(async (tx) => {
+        const created = await findOrCreateBook(data, tx);
+        await setCurrentBookTx(tx, created.id);
+        return created;
+      })
+    : await findOrCreateBook(data);
+
+  revalidatePath(routes.admin());
+  revalidatePath(routes.leer());
+  revalidatePath(routes.hoy());
+  if (data.marcarComoActual) {
+    revalidatePath(routes.libro(book.id));
   }
 
-  return db.book.create({
-    data: {
-      title: data.title,
-      authors: data.authors,
-      coverUrl: data.coverUrl ?? null,
-      description: data.description ?? null,
-      pageCount: data.pageCount ?? null,
-      publishedYear: data.publishedYear ?? null,
-      googleBooksId: data.googleBooksId ?? null,
-      isbn: data.isbn ?? null,
-    },
-  });
+  return { id: book.id, title: book.title };
 }

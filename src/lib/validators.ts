@@ -34,6 +34,10 @@ export const suggestBookSchema = bookInputSchema.extend({
   pitch: z.string().max(800).optional().nullable(),
 });
 
+export const createBookSchema = bookInputSchema.extend({
+  marcarComoActual: z.boolean().default(false),
+});
+
 export const roundSchema = z
   .object({
     title: z.string().min(2).max(160),

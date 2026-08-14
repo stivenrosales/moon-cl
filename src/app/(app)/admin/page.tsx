@@ -14,6 +14,7 @@ import { MeetingEditDialog } from "@/components/admin/meeting-edit-dialog";
 import { MEETING_TYPE_LABELS, MEETING_TYPE_BADGE_VARIANT } from "@/lib/meeting-types";
 import { RoleSelect } from "@/components/admin/role-select";
 import { BookStateButtons } from "@/components/admin/book-state-buttons";
+import { AddBookDialog } from "@/components/admin/add-book-dialog";
 import { NewKahootActivityForm } from "@/components/admin/kahoot-activity-form";
 import { KahootActivityActions } from "@/components/admin/kahoot-activity-actions";
 import { ReportsPanel } from "@/components/admin/reports-panel";
@@ -68,6 +69,12 @@ export default async function AdminPage() {
   ]);
 
   const bookOptions = books.map((b) => ({ id: b.id, title: b.title }));
+  // RoundStatus es un campo, no una verdad: una ronda vencida sigue marcada
+  // OPEN hasta que el cron la cierre (close-expired-rounds corre a diario).
+  // "Hay ronda abierta" tiene que comparar contra endsAt, igual que hace ese
+  // job para encontrar las vencidas — no basta con mirar el status solo.
+  const ahora = new Date();
+  const hayRondaAbierta = rounds.some((r) => r.status === "OPEN" && r.endsAt > ahora);
   const meetingOptions = meetings.map((m) => ({ id: m.id, title: m.title }));
   const memberOptions = users.map((u) => ({
     id: u.id,
@@ -226,7 +233,10 @@ export default async function AdminPage() {
       {/* Libros */}
       {isAdmin ? (
         <section id="libros" className="space-y-4">
-          <h2 className="display text-2xl">Libros del club</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="display text-2xl">Libros del club</h2>
+            <AddBookDialog hayRondaAbierta={hayRondaAbierta} />
+          </div>
           <Card className="p-6">
             {books.length === 0 ? (
               <p className="text-sm text-muted-foreground">Aún no hay libros.</p>

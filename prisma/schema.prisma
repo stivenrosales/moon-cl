@@ -112,6 +112,7 @@ model Book {
   publishedYear Int?
   googleBooksId String?    @unique
   isbn          String?
+  publisher     String?
   status        BookStatus @default(SUGGESTED)
   isCurrent     Boolean    @default(false)
   startedAt     DateTime?

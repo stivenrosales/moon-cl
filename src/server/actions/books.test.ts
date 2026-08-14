@@ -145,4 +145,14 @@ describe("createBook", () => {
     expect(dbBookCreateMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("persiste publisher cuando se lo pasa", async () => {
+    await createBook({ title: "Cien años de soledad", publisher: "Editorial Sudamericana" });
+
+    expect(dbBookCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ publisher: "Editorial Sudamericana" }),
+      }),
+    );
+  });
 });

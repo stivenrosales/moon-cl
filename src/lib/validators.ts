@@ -16,6 +16,7 @@ export const bookInputSchema = z.object({
   publishedYear: z.number().int().min(0).max(2100).optional().nullable(),
   googleBooksId: z.string().max(60).optional().nullable(),
   isbn: z.string().max(20).optional().nullable(),
+  publisher: z.string().max(160).optional().nullable(),
 });
 
 export const bookUpdateSchema = z.object({
@@ -27,6 +28,7 @@ export const bookUpdateSchema = z.object({
   pageCount: z.number().int().positive().max(20000).optional().nullable(),
   publishedYear: z.number().int().min(0).max(2100).optional().nullable(),
   isbn: z.string().max(20).optional().nullable().or(z.literal("")),
+  publisher: z.string().max(160).optional().nullable(),
 });
 
 export const suggestBookSchema = bookInputSchema.extend({
@@ -123,6 +125,16 @@ export const profileUpdateSchema = z.object({
 // validarArchivoAvatar (src/lib/storage/avatar-validation.ts), pura y
 // testeada aparte — acá solo garantizamos que el shape es el esperado.
 export const solicitudSubidaAvatarSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  contentType: z.string().min(1),
+  size: z.number().int().positive(),
+});
+
+// Body de POST /api/cover. Mismo shape que solicitudSubidaAvatarSchema pero
+// declarado aparte a propósito: son endpoints distintos (avatar es de
+// cualquier usuaria, portada es solo de moderación) y si un día cambian las
+// reglas de uno, no queremos que arrastre al otro por compartir schema.
+export const solicitudSubidaPortadaSchema = z.object({
   fileName: z.string().min(1).max(255),
   contentType: z.string().min(1),
   size: z.number().int().positive(),

@@ -82,6 +82,7 @@ describe("findOrCreateBook", () => {
         publishedYear: null,
         googleBooksId: null,
         isbn: null,
+        publisher: null,
       },
     });
   });

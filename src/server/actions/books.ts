@@ -28,6 +28,7 @@ export async function updateBookAction(input: unknown) {
       pageCount: data.pageCount ?? null,
       publishedYear: data.publishedYear ?? null,
       isbn: data.isbn ? data.isbn : null,
+      publisher: data.publisher ?? null,
     },
   });
 

@@ -52,6 +52,7 @@ export interface FindOrCreateBookInput {
   publishedYear?: number | null;
   googleBooksId?: string | null;
   isbn?: string | null;
+  publisher?: string | null;
 }
 
 /**
@@ -81,6 +82,7 @@ export async function findOrCreateBook(data: FindOrCreateBookInput, client: Book
       publishedYear: data.publishedYear ?? null,
       googleBooksId: data.googleBooksId ?? null,
       isbn: data.isbn ?? null,
+      publisher: data.publisher ?? null,
     },
   });
 }

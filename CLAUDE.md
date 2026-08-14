@@ -9,10 +9,16 @@ npm run dev            # servidor de desarrollo
 npm test               # vitest run (620 tests / 47 archivos, ~3s)
 npm run test:watch     # vitest en watch
 npx tsc --noEmit       # chequeo de tipos — el gate real de este repo
+npm run build          # prisma generate && next build — NO toca la base
 npm run db:push        # aplica schema.prisma a la BD (ver "Base de datos")
 npm run db:studio      # explorar la BD
 npm run db:seed        # tsx prisma/seed.ts
+npm run db:backfill-nudges  # siembra UserNudge de usuarias previas a NUDGE_EPOCH
 ```
+
+**`npm run db:migrate` está en `package.json` pero no lo corras.** Este repo no usa
+migraciones (ver "Base de datos"); `prisma migrate dev` crearía `prisma/migrations/` y
+partiría el flujo en dos. El script quedó del scaffold inicial.
 
 Correr un test suelto o filtrar por nombre:
 
@@ -24,6 +30,10 @@ npx vitest run -t "no deja votar en una ronda que no está OPEN"
 **`npm run lint` está roto.** No existe config de ESLint en el repo y `next lint` está
 deprecado en Next 15.5: el comando se cuelga en un prompt interactivo pidiendo crear la
 config. No lo ejecutes. La verificación de este repo es `npx tsc --noEmit` + `npm test`.
+
+El repo versiona `.env.example`, no `.env.local`. Sin `.env.local` no levanta `npm run dev`
+ni corre `db:push` — pero `npm test` y `npx tsc --noEmit` sí funcionan sin él, porque nada
+del suite toca Postgres. Si solo vas a verificar código, no necesitas credenciales.
 
 Al correr comandos de Next aparece un warning de lockfiles múltiples (hay un
 `package-lock.json` en el `$HOME` del usuario). Es ruido, no un problema del proyecto.
@@ -120,6 +130,25 @@ todo → sala de reflexión solo si terminaste el libro → capítulo posterior 
 De ahí que `currentChapter` sea sagrado: si una escritura de progreso lo pisa con `null`,
 las salas quedan ancladas y se vuelven candados.
 
+### La portada de `/hoy`: franja, slots y nudges
+
+Dos servicios distintos alimentan `/hoy` y no se pisan.
+
+`buildUrgency` (`services/urgency-queue.ts`) arma la fila de urgencia: ronda OPEN y
+próxima reunión compiten por **máximo 2 slots** ordenados por fecha límite más cercana; si
+no hay ninguno, entra un slot de **reposo** con una recomendación de "Quiero leer" — la fila
+nunca queda vacía. Un resultado de trivia de las últimas 48h **no compite por slot**: viaja
+aparte en `franja`, porque su criterio es una ventana de expiración, no una fecha límite
+comparable con las otras dos.
+
+`nextNudge` (`services/nudge-queue.ts`) devuelve **una sola invitación para toda la app**,
+no una por página: cada pantalla pinta la que le toca según `NUDGE_SCREENS`. La trampa está
+en que los disparadores son **estados acumulados** ("3 calificaciones", "primer libro
+terminado"), no eventos — una usuaria veterana los cumple todos desde hace meses. Por eso
+cada disparador se ancla a la fecha real en que se volvió cierto y se exige que sea
+posterior a `NUDGE_EPOCH`. Si agregas un nudge nuevo, ánclalo igual o le explotará en la
+cara a todo el club el día del deploy.
+
 ### Cron
 
 Vercel Hobby permite 2 crons con 1 ejecución/día, así que **todos** los jobs cuelgan de un
@@ -130,6 +159,55 @@ propia función (`runBookMatch` sale si no es lunes en `America/Lima`).
 
 Las fechas de negocio se calculan en `America/Lima`, no en UTC — rachas, cumpleaños y
 recordatorios se rompen cerca de medianoche si usas UTC.
+
+## Mapa del dominio
+
+`prisma/schema.prisma` tiene ~22 modelos. Los agrupamientos que no se deducen leyendo un
+solo archivo:
+
+**Elegir libro** — `Round` (`SCHEDULED | OPEN | CLOSED`) → `BookSuggestion` (única por
+`[roundId, bookId]`) → `Vote` (único por `[suggestionId, userId]`). El ganador se congela en
+`Round.winnerBookId`, que es `@unique`: un libro gana una ronda y solo una. `RoundStatus` es
+un campo, no una verdad: una ronda vencida sigue marcada `OPEN` hasta que el cron la cierre,
+así que las reglas comparan contra `endsAt`, nunca contra el status solo.
+
+**Leer** — `Book` es el catálogo compartido; `UserBook` es la estantería de cada quien
+(`ShelfStatus`); `ReadingProgress` es la bitácora append-only. Los tres se tocan juntos, ver
+"Escrituras: una sola puerta por concepto".
+
+**Conversar** — `Comment` lleva `chapter`, `isSpoiler`, `isReflection` y `parentId`: las
+cuatro columnas que consume `gateComment()`. `Message` es DM directo entre dos usuarias (sin
+modelo de conversación: el hilo se deriva del par). `Block` y `Report` son moderación.
+
+**Comunidad** — `Follow`, `Quote`/`QuoteLike`, `Rating`, `Meeting`/`Rsvp`,
+`KahootActivity`/`KahootScore` (trivia). `Match` es el emparejamiento semanal por afinidad,
+único por `[userAId, userBId, weekOf]`, donde `weekOf` es el lunes en `America/Lima`. Ojo:
+`runBookMatch` escribe con `db.match.create` dentro de un loop que además manda el email —
+sin transacción y sin upsert. Una segunda ejecución el mismo lunes **no** es idempotente:
+revienta con violación de constraint después de haber mandado los emails de los pares que
+alcanzó a crear. El histórico de `Match` sirve para otra cosa: evitar repetir pareja en las
+últimas semanas.
+
+**Invitaciones** — `UserNudge`, único por `[userId, key]`: una invitación se muestra una vez
+por persona y nunca vuelve. `reason: 'pre-existing'` marca las filas del backfill.
+
+## Base de datos
+
+**No hay `prisma/migrations/`.** El schema se aplica con `prisma db push` corrido a mano por
+un humano. El build de Vercel (`prisma generate && next build`) **no toca la base**: si
+cambias el schema y nadie corre `db push` contra producción, el deploy queda desincronizado
+y el código nuevo rompe en runtime contra columnas que no existen.
+
+Antes de cualquier cambio de schema lee `docs/MIGRATIONS.md`. Regla corta: escribe el cambio
+como aditivo (columnas opcionales o con `@default`), aplícalo a producción **antes** de
+deployar el código que lo usa, y parte cualquier cambio destructivo en dos deploys.
+
+Ciclo local: editar `schema.prisma` → `npx prisma format` → `npx prisma validate` →
+`npx prisma generate`.
+
+`prisma/init.sql` es un dump del schema inicial que **no lo referencia nadie** y no se
+mantiene. No es la migración base ni el estado actual de la BD: la fuente de verdad es
+`schema.prisma`. No lo edites ni lo apliques.
 
 ## Testing
 
@@ -148,20 +226,6 @@ Los tests de actions mockean Prisma por método con `vi.mock("@/lib/db", ...)`, 
 y casi nunca mockean. Los nombres de test van en español, describiendo la regla de negocio
 ("no deja votar tras el cierre aunque la ronda siga marcada OPEN").
 
-## Base de datos
-
-**No hay `prisma/migrations/`.** El schema se aplica con `prisma db push` corrido a mano por
-un humano. El build de Vercel (`prisma generate && next build`) **no toca la base**: si
-cambias el schema y nadie corre `db push` contra producción, el deploy queda desincronizado
-y el código nuevo rompe en runtime contra columnas que no existen.
-
-Antes de cualquier cambio de schema lee `docs/MIGRATIONS.md`. Regla corta: escribe el cambio
-como aditivo (columnas opcionales o con `@default`), aplícalo a producción **antes** de
-deployar el código que lo usa, y parte cualquier cambio destructivo en dos deploys.
-
-Ciclo local: editar `schema.prisma` → `npx prisma format` → `npx prisma validate` →
-`npx prisma generate`.
-
 ## Convenciones
 
 Todo el código está en **español**: nombres de dominio (`buildToday`, `resolverSegmentoActivo`,
@@ -174,6 +238,12 @@ sueltos: `TodayHero` es `"sin-libro" | "sin-empezar" | "leyendo"`, `GateDecision
 `{ locked: false } | { locked: true; reason }`. Preserva la distinción `null` vs `0` —
 "nunca marcó avance" y "marcó la página 0" son estados distintos y colapsarlos con `?? 0`
 ya causó bugs de copy.
+
+`src/components/ui/` son primitivas genéricas al estilo shadcn (envoltorios de Radix +
+`cva` + `cn`) y **no conocen el dominio**: no importes `@/lib/routes` ni tipos de Prisma ahí.
+Todo lo que sabe qué es una ronda, un nudge o una estantería vive en `src/components/*.tsx`
+plano. Fuera de Radix, la caja de UI es `framer-motion` (animación), `sonner` (toasts) y
+`next-themes` (tema) — no agregues una cuarta librería para lo mismo.
 
 `DESIGN.md` (tokens, escala tipográfica, elevación, anti-patterns) y `PRODUCT.md` (usuarias,
 tono, anti-referencias) son vinculantes para cualquier cambio de UI. Resumen operativo:

@@ -28,6 +28,16 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Mismo motivo que en el Dockerfile, y hay que repetirlo acá porque
+      # setup-node con Node 20 también trae npm 10: el lockfile se generó con
+      # npm 11, que resuelve distinto una peerDependency opcional de next-auth
+      # (nodemailer@^7). Con npm 10, `npm ci` falla con EUSAGE "Missing:
+      # nodemailer" aunque package.json y el lock estén sincronizados.
+      #
+      # Node se queda en 20 a propósito: el gate debe correr sobre la misma
+      # versión que la imagen de producción, no sobre una más nueva.
+      - run: npm install -g npm@11
+
       - run: npm ci
 
       - name: Chequeo de tipos

@@ -19,6 +19,7 @@ import { NewKahootActivityForm } from "@/components/admin/kahoot-activity-form";
 import { KahootActivityActions } from "@/components/admin/kahoot-activity-actions";
 import { ReportsPanel, type ReportRow } from "@/components/admin/reports-panel";
 import { aPersonaPublica } from "@/lib/persona-publica";
+import { contarSociasPorPais } from "./socias-por-pais";
 // getInitials sigue acá para la lista de "Miembros" de más abajo, que se
 // pinta dentro de este Server Component: ahí el correo se usa y se queda.
 import { formatDate, getInitials } from "@/lib/utils";
@@ -78,6 +79,9 @@ export default async function AdminPage() {
   // job para encontrar las vencidas — no basta con mirar el status solo.
   const ahora = new Date();
   const hayRondaAbierta = rounds.some((r) => r.status === "OPEN" && r.endsAt > ahora);
+  // Reduce en memoria sobre `users`, ya cargado arriba: sin query nueva,
+  // mismo patrón inline que hayRondaAbierta.
+  const conteoPorPais = contarSociasPorPais(users);
   const meetingOptions = meetings.map((m) => ({ id: m.id, title: m.title }));
   // Los formularios de Kahoot son Client Components: mandarles la fila
   // entera dejaba el correo de todo el club embebido en el HTML de /admin.
@@ -282,6 +286,18 @@ export default async function AdminPage() {
       {isAdmin ? (
         <section id="miembros" className="space-y-4">
           <h2 className="display text-2xl">Miembros del club</h2>
+          {conteoPorPais.paises.length > 0 || conteoPorPais.sinEspecificar > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {conteoPorPais.paises.map((p) => (
+                <Badge key={p.codigo} variant="outline">
+                  {p.nombre} · {p.cantidad}
+                </Badge>
+              ))}
+              {conteoPorPais.sinEspecificar > 0 ? (
+                <Badge variant="outline">Sin especificar · {conteoPorPais.sinEspecificar}</Badge>
+              ) : null}
+            </div>
+          ) : null}
           <Card className="p-6">
             <ul className="divide-y divide-border/60">
               {users.map((u) => (

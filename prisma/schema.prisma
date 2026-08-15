@@ -20,6 +20,9 @@ model User {
   role           Role      @default(MEMBER)
   bio            String?
   birthday       DateTime? @db.Date
+  countryCode    String?
+  city           String?
+  citySlug       String?
   favoriteGenres String[]  @default([])
   ageConfirmedAt DateTime?
   onboardedAt    DateTime?

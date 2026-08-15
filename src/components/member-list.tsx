@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FollowButton } from "@/components/follow-button";
 import { routes } from "@/lib/routes";
 import type { PersonaPublica } from "@/lib/persona-publica";
+import { opcionesCiudad, filtrarPorCiudad } from "./member-list-filter";
 
 /**
  * Extiende PersonaPublica y NO agrega el correo: este componente es cliente,
@@ -24,6 +26,12 @@ export interface MemberRow extends PersonaPublica {
   isNew: boolean;
   /** Afinidad >=70 con evidencia real (contrato: nunca con datos vacíos). */
   veryAffine: boolean;
+  /**
+   * Dato interno para el filtro de ciudad, no algo que se muestra:
+   * PersonaPublica ya expone `ciudad` (la etiqueta legible), esto es solo
+   * la clave para agrupar/filtrar — mismo criterio que citySlug en la base.
+   */
+  citySlug: string | null;
 }
 
 interface MemberListProps {
@@ -32,6 +40,12 @@ interface MemberListProps {
 
 export function MemberList({ rows }: MemberListProps) {
   const [query, setQuery] = React.useState("");
+  const [citySlug, setCitySlug] = React.useState<string | null>(null);
+
+  // Mismas rows ya cargadas, no un catálogo fijo ni un groupBy contra la
+  // base: las opciones son las ciudades que las propias socias declararon.
+  // Si nadie lo hizo, sale vacío y el <Select> no se pinta más abajo.
+  const opciones = React.useMemo(() => opcionesCiudad(rows), [rows]);
 
   // Se busca solo por el nombre visible, ya no por correo. Es una decisión de
   // producto tomada a conciencia: filtrar por correo en el cliente OBLIGA a
@@ -39,12 +53,15 @@ export function MemberList({ rows }: MemberListProps) {
   // leak. No se pierde tanto como parece — para quien no tiene nombre propio,
   // `nombre` ES el usuario de su correo, que es lo que la fila ya pintaba.
   // La alternativa (buscar en el servidor con una action) no se justifica para
-  // un directorio de club: son decenas de filas, no miles.
+  // un directorio de club: son decenas de filas, no miles. El filtro de
+  // ciudad sigue el mismo camino y compone con este: ambos se aplican sobre
+  // rows, uno independiente del otro.
   const filtered = React.useMemo(() => {
+    const porCiudad = filtrarPorCiudad(rows, citySlug);
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => (r.nombre ?? "").toLowerCase().includes(q));
-  }, [rows, query]);
+    if (!q) return porCiudad;
+    return porCiudad.filter((r) => (r.nombre ?? "").toLowerCase().includes(q));
+  }, [rows, query, citySlug]);
 
   if (rows.length === 0) {
     return (
@@ -60,20 +77,37 @@ export function MemberList({ rows }: MemberListProps) {
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre…"
-          className="h-9 pl-9"
-          aria-label="Buscar miembro"
-        />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre…"
+            className="h-9 pl-9"
+            aria-label="Buscar miembro"
+          />
+        </div>
+        {opciones.length > 0 ? (
+          <Select
+            value={citySlug ?? ""}
+            onChange={(e) => setCitySlug(e.target.value || null)}
+            className="h-9 sm:w-48"
+            aria-label="Filtrar por ciudad"
+          >
+            <option value="">Todas las ciudades</option>
+            {opciones.map((o) => (
+              <option key={o.citySlug} value={o.citySlug}>
+                {o.ciudad}
+              </option>
+            ))}
+          </Select>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Nada coincide con "{query}".
+          {query ? `Nada coincide con "${query}".` : "Nadie coincide con ese filtro."}
         </p>
       ) : (
         <ul className="divide-y divide-border/40 rounded-xl border border-border/40 bg-card/40">
@@ -111,6 +145,7 @@ export function MemberList({ rows }: MemberListProps) {
 
 function contextLine(m: MemberRow): string {
   const parts: string[] = [];
+  if (m.ciudad) parts.push(m.ciudad);
   if (m.readingTitle) parts.push(`Leyendo ${m.readingTitle}`);
   if (m.booksInCommon > 0) {
     parts.push(`${m.booksInCommon} libro${m.booksInCommon === 1 ? "" : "s"} en común`);

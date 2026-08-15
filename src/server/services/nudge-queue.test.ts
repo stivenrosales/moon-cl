@@ -11,12 +11,17 @@ const NOW = new Date("2026-07-20T12:00:00.000Z"); // 4 días después del epoch
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Insumo base: nadie cumple ningún disparador. Cada test sobreescribe lo suyo. */
+/** Insumo base: nadie cumple ningún disparador. Cada test sobreescribe lo suyo.
+ * countryCode default "PE": la inmensa mayoría de los tests preexistentes fija
+ * onboardedAt para ejercitar otro disparador, y ubicacion es el único check
+ * que NO exige afterEpoch — si el default fuera null, esos tests dispararían
+ * "ubicacion" por accidente en vez del nudge que realmente quieren probar. */
 function baseInput(overrides: Partial<NudgeQueueInput> = {}): NudgeQueueInput {
   return {
     now: NOW,
     dismissedKeys: new Set(),
     onboardedAt: null,
+    countryCode: "PE",
     accountCreatedAt: new Date("2020-01-01T00:00:00.000Z"),
     userBookCount: 0,
     readingProgressCount: 0,
@@ -63,6 +68,44 @@ describe("buildNudgeQueue — la peor amenaza: Camila la veterana", () => {
         userBookCount: 0,
         readingProgressCount: 0,
       }),
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("buildNudgeQueue — ubicacion (la única excepción al epoch, a propósito)", () => {
+  it("SI aparece para una veterana con onboardedAt muy anterior a NUDGE_EPOCH y sin countryCode: no es un bug, es la excepción — no ancla a onboardedAt sino al dato que falta hoy", () => {
+    const preEpoch = new Date(NUDGE_EPOCH.getTime() - 200 * DAY_MS);
+
+    const result = buildNudgeQueue(baseInput({ onboardedAt: preEpoch, countryCode: null }));
+
+    expect(result).toEqual({ key: "ubicacion", screen: "hoy", inline: false });
+  });
+
+  it("no aparece si ya tiene countryCode, aunque onboardedAt sea muy anterior al epoch", () => {
+    const preEpoch = new Date(NUDGE_EPOCH.getTime() - 200 * DAY_MS);
+
+    const result = buildNudgeQueue(baseInput({ onboardedAt: preEpoch, countryCode: "PE" }));
+
+    expect(result).toBeNull();
+  });
+
+  it("una recién llegada con país sigue viendo bienvenida: la escalera de arranque existente no cambió", () => {
+    const onboardedAt = new Date(NOW.getTime() - 2 * DAY_MS);
+
+    const result = buildNudgeQueue(
+      baseInput({ onboardedAt, countryCode: "PE", userBookCount: 0 }),
+    );
+
+    expect(result).toEqual({ key: "bienvenida", screen: "hoy", inline: false });
+  });
+
+  it("si 'ubicacion' está en dismissedKeys, no aparece aunque el disparador siga cumpliéndose", () => {
+    const preEpoch = new Date(NUDGE_EPOCH.getTime() - 200 * DAY_MS);
+
+    const result = buildNudgeQueue(
+      baseInput({ onboardedAt: preEpoch, countryCode: null, dismissedKeys: new Set(["ubicacion"]) }),
     );
 
     expect(result).toBeNull();
@@ -336,6 +379,7 @@ function createFakeClient(overrides: Partial<Record<string, ReturnType<typeof vi
         onboardedAt: null,
         createdAt: new Date("2020-01-01T00:00:00.000Z"),
         isMatchOptIn: false,
+        countryCode: "PE",
       }),
     },
     userBook: {
@@ -382,6 +426,7 @@ describe("nextNudge", () => {
         onboardedAt,
         createdAt: onboardedAt,
         isMatchOptIn: false,
+        countryCode: "PE",
       }),
       userBookCount: vi.fn().mockResolvedValue(0),
     });
@@ -398,6 +443,7 @@ describe("nextNudge", () => {
         onboardedAt,
         createdAt: onboardedAt,
         isMatchOptIn: false,
+        countryCode: "PE",
       }),
       userBookCount: vi.fn().mockResolvedValue(0),
       userNudgeFindMany: vi.fn().mockResolvedValue([{ key: "bienvenida" }]),
@@ -414,5 +460,26 @@ describe("nextNudge", () => {
       }),
     );
     expect(result).toBeNull();
+  });
+
+  it("trae countryCode del select existente (sin query extra) y lo usa para armar ubicacion, sin importar onboardedAt", async () => {
+    const preEpoch = new Date(NUDGE_EPOCH.getTime() - 200 * DAY_MS);
+    const client = createFakeClient({
+      userFindUnique: vi.fn().mockResolvedValue({
+        onboardedAt: preEpoch,
+        createdAt: preEpoch,
+        isMatchOptIn: false,
+        countryCode: null,
+      }),
+    });
+
+    const result = await nextNudge("user-1", client, NOW);
+
+    expect(client.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ countryCode: true }),
+      }),
+    );
+    expect(result).toEqual({ key: "ubicacion", screen: "hoy", inline: false });
   });
 });

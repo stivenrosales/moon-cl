@@ -74,6 +74,17 @@ describe("resolveNudgeCopy", () => {
     expect(copy.body).toBe("Todavía no sugieres nada. Un libro tuyo puede terminar en la mesa de todos.");
     expect(copy.cta).toBe("Sugerir un libro");
   });
+
+  it("ubicacion no depende de contexto", () => {
+    const copy = resolveNudgeCopy("ubicacion");
+    expect(copy.kicker).toBe("TE FALTA UN DATO");
+    expect(copy.title).toBe("¿De dónde nos lees?");
+    expect(copy.titleScript).toBe(false);
+    expect(copy.body).toBe(
+      "Con tu ciudad y país, las socias del club te encuentran por cercanía. Son 10 segundos.",
+    );
+    expect(copy.cta).toBe("Agregar mi ubicación");
+  });
 });
 
 describe("resolveNudgeAction", () => {
@@ -143,6 +154,13 @@ describe("resolveNudgeAction", () => {
     expect(resolveNudgeAction("sugerir")).toEqual({
       type: "navigate",
       href: routes.agenda({ vista: "votaciones" }),
+    });
+  });
+
+  it("ubicacion navega al perfil, donde está el formulario para completarla", () => {
+    expect(resolveNudgeAction("ubicacion")).toEqual({
+      type: "navigate",
+      href: routes.perfil(),
     });
   });
 });

@@ -77,6 +77,17 @@ export function BookEditDialog({ book }: BookEditDialogProps) {
 // fuentes posibles es la que gana.
 type FuentePortada = "actual" | "busqueda" | "archivo";
 
+// "Sin resultados" y "la búsqueda falló" son estados distintos (ver
+// BookSearchResult en @/lib/google-books): antes un 429 de Google Books se
+// mostraba igual que "no hay portadas para ese título". Un solo
+// discriminated union en vez de resultados/buscando/error sueltos evita
+// que se puedan pisar entre sí.
+type EstadoBusquedaPortadas =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "ok"; books: BookCandidate[] }
+  | { tipo: "error" };
+
 function BookEditForm({
   book,
   onClose,
@@ -111,30 +122,38 @@ function BookEditForm({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [coverQuery, setCoverQuery] = React.useState("");
-  const [coverResults, setCoverResults] = React.useState<BookCandidate[]>([]);
-  const [searchingCovers, setSearchingCovers] = React.useState(false);
+  const [estadoPortadas, setEstadoPortadas] = React.useState<EstadoBusquedaPortadas>({
+    tipo: "vacio",
+  });
   const [coverPickerOpen, setCoverPickerOpen] = React.useState(false);
+
+  const buscarPortadas = React.useCallback(async (q: string) => {
+    setEstadoPortadas({ tipo: "buscando" });
+    try {
+      const resultado = await searchBooksAction(q);
+      setEstadoPortadas(
+        resultado.status === "error"
+          ? { tipo: "error" }
+          : { tipo: "ok", books: resultado.books.filter((b) => !!b.coverUrl) },
+      );
+    } catch {
+      // La action en sí no debería rechazar (searchBooks nunca lanza), pero
+      // si falla la llamada RPC es el mismo caso: la búsqueda falló, no que
+      // no haya portadas para ese título.
+      setEstadoPortadas({ tipo: "error" });
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!coverPickerOpen) return;
     const q = coverQuery.trim();
     if (q.length < 2) {
-      setCoverResults([]);
+      setEstadoPortadas({ tipo: "vacio" });
       return;
     }
-    const handle = setTimeout(async () => {
-      setSearchingCovers(true);
-      try {
-        const items = await searchBooksAction(q);
-        setCoverResults(items.filter((b) => !!b.coverUrl));
-      } catch {
-        toast.error("No se pudo buscar portadas");
-      } finally {
-        setSearchingCovers(false);
-      }
-    }, 350);
+    const handle = setTimeout(() => buscarPortadas(q), 350);
     return () => clearTimeout(handle);
-  }, [coverQuery, coverPickerOpen]);
+  }, [coverQuery, coverPickerOpen, buscarPortadas]);
 
   // Libera el objectURL del preview cada vez que cambia (se reemplaza por
   // otro archivo o por otra fuente) o al desmontar el form al cerrar el
@@ -304,13 +323,28 @@ function BookEditForm({
               onChange={(e) => setCoverQuery(e.target.value)}
               placeholder="Buscar por título o autor…"
             />
-            {searchingCovers ? (
+            {estadoPortadas.tipo === "buscando" ? (
               <div className="flex justify-center py-6">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : coverResults.length > 0 ? (
+            ) : estadoPortadas.tipo === "error" ? (
+              <div className="flex flex-col items-center gap-2 py-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No pudimos buscar portadas. Puede ser un problema temporal con Google Books
+                  o Open Library.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => buscarPortadas(coverQuery.trim())}
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ) : estadoPortadas.tipo === "ok" && estadoPortadas.books.length > 0 ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto">
-                {coverResults.map((b) => (
+                {estadoPortadas.books.map((b) => (
                   <button
                     key={b.googleBooksId}
                     type="button"
@@ -325,7 +359,7 @@ function BookEditForm({
                   </button>
                 ))}
               </div>
-            ) : coverQuery.length >= 2 ? (
+            ) : estadoPortadas.tipo === "ok" ? (
               <p className="text-center text-sm text-muted-foreground py-4">
                 Sin resultados con portada.
               </p>

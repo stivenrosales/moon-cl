@@ -11,6 +11,7 @@ import { SegmentedControl } from "@/components/segmented-control";
 import { NudgeCard } from "@/components/nudge-card";
 import { FeedCardsSkeleton, MemberRowsSkeleton, QuoteCardsSkeleton } from "@/components/skeletons";
 import { resolverSegmentoActivo } from "@/lib/segmented-control";
+import { aPersonaPublica, nombreVisible } from "@/lib/persona-publica";
 import { nextNudge } from "@/server/services/nudge-queue";
 import { ActivityFeed } from "./activity-feed";
 import { QuotesPanel } from "./quotes-panel";
@@ -105,10 +106,9 @@ async function ActividadView() {
 
     if (otherUser && affinity) {
       weeklyMatchCard = {
-        otherUserId: otherUser.id,
-        otherUserName: otherUser.name,
-        otherUserEmail: otherUser.email,
-        otherUserImage: otherUser.image,
+        // Solo lo derivado: el correo de la pareja no cruza a MatchCard, que
+        // es cliente y lo dejaría embebido en el HTML de /club.
+        otherUser: aPersonaPublica(otherUser),
         score: weeklyMatch.score,
         label: labelForScore(weeklyMatch.score),
         evidence: affinity.evidence,
@@ -211,7 +211,10 @@ async function resolvePrimerMensajeContext(userId: string) {
 
   return {
     personaId: otherId,
-    persona: latestFollow.following.name ?? latestFollow.following.email?.split("@")[0],
+    // nombreVisible, no el correo crudo: NudgeCard es cliente. Acá ya se
+    // mandaba solo lo derivado, pero pasa por el mismo helper para que el
+    // criterio viva en un solo lugar.
+    persona: nombreVisible(latestFollow.following.name, latestFollow.following.email) ?? undefined,
     libroEnComun: commonMine?.book.title,
   };
 }
@@ -226,9 +229,13 @@ async function PersonasView() {
   // depende del resultado del nudge, así que ese sí queda secuencial.
   const [nudge, users] = await Promise.all([
     nextNudge(userId),
+    // select explícito: sin él, findMany traía la fila entera de User
+    // (bio, cumpleaños, rol, correo…) para todo el club. Acá el correo se
+    // usa solo para derivar nombre e iniciales — no sale del servidor.
     db.user.findMany({
       where: { id: { not: userId } },
       orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true, image: true, createdAt: true },
     }),
   ]);
   const clubPersonasNudge = nudge && nudge.screen === "club-personas" ? nudge : null;
@@ -275,10 +282,10 @@ async function PersonasView() {
       (affinity.evidence.librosEnComun > 0 || affinity.evidence.generosEnComun.length > 0);
 
     return {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      image: u.image,
+      // aPersonaPublica deja fuera el correo a propósito: MemberList es un
+      // Client Component, así que mandarlo era publicar el directorio de
+      // correos del club en el HTML de /club?vista=personas.
+      ...aPersonaPublica(u),
       isFollowing: followingSet.has(u.id),
       booksInCommon:
         viewerAffinityData && memberAffinityData

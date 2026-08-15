@@ -9,14 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { routes } from "@/lib/routes";
-import { getInitials } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
 import { toggleMatchOptIn } from "@/server/actions/match";
 
 export interface MatchCardMatch {
-  otherUserId: string;
-  otherUserName: string | null;
-  otherUserEmail: string | null;
-  otherUserImage: string | null;
+  /**
+   * Nombre e iniciales ya resueltos en el servidor. El correo de la pareja NO
+   * viaja hasta acá aunque la card invite a escribirle: este es un Client
+   * Component y el dato quedaría en el HTML (ver lib/persona-publica.ts). El
+   * contacto se hace por /mensajes, que no necesita el correo.
+   */
+  otherUser: PersonaPublica;
   score: number;
   label: string;
   evidence: { librosEnComun: number; generosEnComun: string[] };
@@ -53,7 +56,7 @@ export function MatchCard({ isOptedIn: initialOptedIn, match }: MatchCardProps) 
   }
 
   if (match) {
-    const name = match.otherUserName ?? match.otherUserEmail?.split("@")[0] ?? "alguien del club";
+    const name = match.otherUser.nombre ?? "alguien del club";
     const evidenceParts: string[] = [];
     if (match.evidence.librosEnComun > 0) {
       evidenceParts.push(
@@ -73,10 +76,8 @@ export function MatchCard({ isOptedIn: initialOptedIn, match }: MatchCardProps) 
 
         <div className="flex items-center gap-4">
           <Avatar className="h-14 w-14 shrink-0">
-            {match.otherUserImage ? <AvatarImage src={match.otherUserImage} alt="" /> : null}
-            <AvatarFallback className="text-base">
-              {getInitials(match.otherUserName, match.otherUserEmail)}
-            </AvatarFallback>
+            {match.otherUser.image ? <AvatarImage src={match.otherUser.image} alt="" /> : null}
+            <AvatarFallback className="text-base">{match.otherUser.iniciales}</AvatarFallback>
           </Avatar>
           <div className="space-y-1.5">
             <p className="text-4xl font-bold tabular-nums leading-none text-accent-text">{match.score}%</p>
@@ -96,7 +97,7 @@ export function MatchCard({ isOptedIn: initialOptedIn, match }: MatchCardProps) 
         </div>
 
         <Button asChild size="sm" className="w-full sm:w-auto">
-          <Link href={routes.mensajeCon(match.otherUserId)}>Saludar a {name}</Link>
+          <Link href={routes.mensajeCon(match.otherUser.id)}>Saludar a {name}</Link>
         </Button>
       </Card>
     );

@@ -17,32 +17,48 @@ interface BookSearchProps {
   onSuggested?: () => void;
 }
 
+// "Sin resultados" y "la búsqueda falló" son estados distintos (ver
+// BookSearchResult en @/lib/google-books): antes un 429 de Google Books se
+// mostraba igual que "ese libro no existe". Un solo discriminated union en
+// vez de results/searching/error sueltos evita que se puedan pisar entre sí.
+type EstadoBusqueda =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "ok"; books: BookCandidate[] }
+  | { tipo: "error" };
+
 export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<BookCandidate[]>([]);
-  const [searching, setSearching] = React.useState(false);
+  const [estado, setEstado] = React.useState<EstadoBusqueda>({ tipo: "vacio" });
   const [selected, setSelected] = React.useState<BookCandidate | null>(null);
   const [pitch, setPitch] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
+  const buscar = React.useCallback(async (q: string) => {
+    setEstado({ tipo: "buscando" });
+    try {
+      const resultado = await searchBooksAction(q);
+      setEstado(
+        resultado.status === "error"
+          ? { tipo: "error" }
+          : { tipo: "ok", books: resultado.books },
+      );
+    } catch (err) {
+      // La action en sí no debería rechazar (searchBooks nunca lanza), pero
+      // si falla la llamada RPC (sin red, por ejemplo) es el mismo caso:
+      // la búsqueda falló, no que no haya resultados.
+      setEstado({ tipo: "error" });
+    }
+  }, []);
+
   React.useEffect(() => {
     if (!query || query.length < 2) {
-      setResults([]);
+      setEstado({ tipo: "vacio" });
       return;
     }
-    const handle = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const items = await searchBooksAction(query);
-        setResults(items);
-      } catch (err) {
-        toast.error("No se pudo buscar libros");
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
+    const handle = setTimeout(() => buscar(query), 350);
     return () => clearTimeout(handle);
-  }, [query]);
+  }, [query, buscar]);
 
   async function handleSubmit() {
     if (!selected) return;
@@ -64,7 +80,7 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
       setSelected(null);
       setPitch("");
       setQuery("");
-      setResults([]);
+      setEstado({ tipo: "vacio" });
       onSuggested?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al sugerir";
@@ -137,14 +153,14 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
           onChange={(e) => setQuery(e.target.value)}
           className="pl-10"
         />
-        {searching ? (
+        {estado.tipo === "buscando" ? (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
         ) : null}
       </div>
 
-      {results.length > 0 ? (
+      {estado.tipo === "ok" && estado.books.length > 0 ? (
         <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-2 -mr-2">
-          {results.map((book) => (
+          {estado.books.map((book) => (
             <li key={book.googleBooksId}>
               <button
                 type="button"
@@ -163,15 +179,25 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
             </li>
           ))}
         </ul>
-      ) : query.length >= 2 && !searching ? (
+      ) : estado.tipo === "error" ? (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No pudimos completar la búsqueda. Puede ser un problema temporal con Google Books
+            o Open Library.
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => buscar(query)}>
+            Reintentar
+          </Button>
+        </div>
+      ) : estado.tipo === "ok" ? (
         <p className="text-center text-sm text-muted-foreground py-8">
           Sin resultados. Prueba otro título.
         </p>
-      ) : (
+      ) : estado.tipo === "vacio" ? (
         <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground py-6">
           ✦ Empieza a escribir el título o autor ✦
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

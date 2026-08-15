@@ -10,7 +10,8 @@ import { VoteButton } from "@/components/vote-button";
 import { ChooseWinnerButton } from "@/components/admin/choose-winner-button";
 import { DeleteSuggestionButton } from "@/components/delete-suggestion-button";
 import { routes } from "@/lib/routes";
-import { cn, getInitials } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
+import { cn } from "@/lib/utils";
 
 export interface SuggestionRow {
   id: string;
@@ -26,12 +27,11 @@ export interface SuggestionRow {
     coverUrl: string | null;
     publishedYear: number | null;
   };
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  };
+  /**
+   * Quien sugirió el libro, sin correo: este componente es cliente y el dato
+   * terminaría en el HTML de la ronda (ver lib/persona-publica.ts).
+   */
+  user: PersonaPublica;
 }
 
 interface Props {
@@ -55,12 +55,10 @@ export function RoundSuggestionsList({
     const q = query.trim().toLowerCase();
     if (!q) return suggestions;
     return suggestions.filter((s) => {
-      const haystack = [
-        s.book.title,
-        s.book.authors.join(" "),
-        s.user.name ?? "",
-        s.user.email ?? "",
-      ]
+      // Sin correo en el haystack: buscar por correo obligaba a mandarlo al
+      // navegador. `nombre` ya trae el usuario del correo para quien no tiene
+      // nombre propio, que es lo que la fila muestra.
+      const haystack = [s.book.title, s.book.authors.join(" "), s.user.nombre ?? ""]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
@@ -146,12 +144,10 @@ export function RoundSuggestionsList({
                     <div className="mt-1.5 flex items-center gap-1.5">
                       <Avatar className="h-4 w-4">
                         {s.user.image ? <AvatarImage src={s.user.image} alt="" /> : null}
-                        <AvatarFallback className="text-[8px]">
-                          {getInitials(s.user.name, s.user.email)}
-                        </AvatarFallback>
+                        <AvatarFallback className="text-[8px]">{s.user.iniciales}</AvatarFallback>
                       </Avatar>
                       <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground truncate">
-                        {s.user.name ?? s.user.email?.split("@")[0]}
+                        {s.user.nombre}
                       </span>
                     </div>
                   </div>

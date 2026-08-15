@@ -26,7 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import { BookCover } from "@/components/book-cover";
 import { moveShelf, removeFromShelf, updateMyBook } from "@/server/actions/shelves";
 import { routes } from "@/lib/routes";
-import { pageProgress } from "@/lib/utils";
+import { resolverFilaProgreso } from "@/components/shelf-book-row-progress";
 
 export interface ShelfBookRowData {
   id: string;
@@ -118,7 +118,7 @@ export function ShelfBookRow({ item, variant = "row" }: ShelfBookRowProps) {
       onOpenChange={setProgressOpen}
       bookId={item.bookId}
       totalPages={item.book.pageCount}
-      initialPage={item.currentPage ?? 0}
+      initialPage={item.currentPage}
       initialChapter={item.currentChapter ?? undefined}
     />
   );
@@ -171,7 +171,7 @@ export function ShelfBookRow({ item, variant = "row" }: ShelfBookRowProps) {
     );
   }
 
-  const pct = pageProgress(item.currentPage, item.book.pageCount);
+  const progreso = resolverFilaProgreso(item.currentPage, item.currentChapter, item.book.pageCount);
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border/40 bg-card/40 p-2.5 sm:p-3">
@@ -191,13 +191,9 @@ export function ShelfBookRow({ item, variant = "row" }: ShelfBookRowProps) {
           <div className="mt-1.5 space-y-1">
             <div className="flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Progreso</span>
-              <span className="tabular-nums text-foreground">
-                {pct}%
-                {item.book.pageCount ? ` · pág. ${item.currentPage ?? 0}/${item.book.pageCount}` : ""}
-                {item.currentChapter ? ` · cap. ${item.currentChapter}` : ""}
-              </span>
+              <span className="tabular-nums text-foreground">{progreso.texto}</span>
             </div>
-            <Progress value={pct} />
+            {progreso.mostrarBarra ? <Progress value={progreso.pct} /> : null}
           </div>
         ) : item.status === "FINISHED" ? (
           <span className="mt-1 inline-flex items-center text-[10px] uppercase tracking-[0.18em] text-accent-text">
@@ -223,13 +219,18 @@ function UpdateProgressDialog({
   onOpenChange: (open: boolean) => void;
   bookId: string;
   totalPages: number | null;
-  initialPage: number;
+  initialPage: number | null;
   initialChapter?: number;
 }) {
   // number | "": "" es el sentinel de "campo vacío" (mismo patrón que
   // hero-card.tsx). Con page: number, "0 || undefined" perdía la página 0
   // antes de llegar a la action porque 0 es falsy en JS.
-  const [page, setPage] = React.useState<number | "">(initialPage);
+  //
+  // initialPage llega en null cuando la usuaria nunca marcó avance (no
+  // "0 ?? 0"): precargar el input con 0 acá era el mismo colapso que en la
+  // fila de progreso — quien nunca abrió este diálogo, al guardar sin tocar
+  // nada, terminaba declarando "estoy en la página 0" sin haberlo elegido.
+  const [page, setPage] = React.useState<number | "">(initialPage ?? "");
   const [chapter, setChapter] = React.useState<string>(
     initialChapter ? String(initialChapter) : "",
   );
@@ -237,7 +238,7 @@ function UpdateProgressDialog({
 
   React.useEffect(() => {
     if (open) {
-      setPage(initialPage);
+      setPage(initialPage ?? "");
       setChapter(initialChapter ? String(initialChapter) : "");
     }
   }, [open, initialPage, initialChapter]);

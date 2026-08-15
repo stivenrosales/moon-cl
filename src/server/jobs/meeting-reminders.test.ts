@@ -56,8 +56,11 @@ describe("sendMeetingReminders", () => {
   beforeEach(() => {
     findManyMock.mockReset();
     updateMock.mockReset();
-    emailsSendMock.mockClear();
-    batchSendMock.mockClear();
+    // Se re-arman (no solo mockClear) porque varios tests encolan un
+    // mockResolvedValueOnce: mockClear no drena esa cola y el error se
+    // filtraría al test siguiente.
+    emailsSendMock.mockReset().mockResolvedValue({ data: { id: "e1" }, error: null });
+    batchSendMock.mockReset().mockResolvedValue({ data: { data: [] }, error: null });
     process.env.AUTH_RESEND_KEY = "re_test_key";
   });
 
@@ -83,7 +86,7 @@ describe("sendMeetingReminders", () => {
 
     const result = await sendMeetingReminders(now);
 
-    expect(result).toEqual({ reminded: 0, emailsSent: 0 });
+    expect(result).toEqual({ reminded: 0, emailsSent: 0, fallos: [], sinCredenciales: false });
     expect(updateMock).not.toHaveBeenCalled();
     expect(emailsSendMock).not.toHaveBeenCalled();
     expect(batchSendMock).not.toHaveBeenCalled();
@@ -96,7 +99,7 @@ describe("sendMeetingReminders", () => {
 
     const result = await sendMeetingReminders(now);
 
-    expect(result).toEqual({ reminded: 1, emailsSent: 2 });
+    expect(result).toEqual({ reminded: 1, emailsSent: 2, fallos: [], sinCredenciales: false });
     expect(updateMock).toHaveBeenCalledWith({
       where: { id: "reprogramada" },
       data: { remindedAt: now },
@@ -144,7 +147,7 @@ describe("sendMeetingReminders", () => {
 
     const result = await sendMeetingReminders(now);
 
-    expect(result).toEqual({ reminded: 1, emailsSent: 0 });
+    expect(result).toEqual({ reminded: 1, emailsSent: 0, fallos: [], sinCredenciales: false });
     expect(emailsSendMock).not.toHaveBeenCalled();
     expect(batchSendMock).not.toHaveBeenCalled();
     expect(updateMock).toHaveBeenCalledWith({
@@ -160,5 +163,67 @@ describe("sendMeetingReminders", () => {
 
     const call = findManyMock.mock.calls[0][0];
     expect(call.where.startsAt.gte).toBeInstanceOf(Date);
+  });
+
+  it("no marca remindedAt cuando batch.send devuelve error: la reunión se reintenta mañana", async () => {
+    // El SDK de Resend no lanza: devuelve { data: null, error }. Marcar
+    // remindedAt igual enterraba la reunión para siempre.
+    findManyMock.mockResolvedValue([meeting()]);
+    batchSendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "validation_error", message: "dominio no verificado" },
+    });
+
+    const result = await sendMeetingReminders(now);
+
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(result.reminded).toBe(0);
+    expect(result.emailsSent).toBe(0);
+    expect(result.fallos).toEqual([
+      { meetingId: "m1", motivo: expect.stringContaining("dominio no verificado") },
+    ]);
+  });
+
+  it("no marca remindedAt cuando emails.send devuelve error con un solo destinatario", async () => {
+    findManyMock.mockResolvedValue([
+      meeting({ rsvps: [{ user: { email: "solo@example.com", name: "Solo" } }] }),
+    ]);
+    emailsSendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "rate_limit_exceeded", message: "demasiados envíos" },
+    });
+
+    const result = await sendMeetingReminders(now);
+
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(result.emailsSent).toBe(0);
+    expect(result.fallos).toEqual([
+      { meetingId: "m1", motivo: expect.stringContaining("demasiados envíos") },
+    ]);
+  });
+
+  it("un fallo de envío no aborta el loop: la reunión siguiente se procesa igual", async () => {
+    findManyMock.mockResolvedValue([meeting({ id: "falla" }), meeting({ id: "sigue" })]);
+    batchSendMock.mockRejectedValueOnce(new Error("socket hang up"));
+
+    const result = await sendMeetingReminders(now);
+
+    expect(result.reminded).toBe(1);
+    expect(result.emailsSent).toBe(2);
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(updateMock).toHaveBeenCalledWith({ where: { id: "sigue" }, data: { remindedAt: now } });
+    expect(result.fallos).toEqual([{ meetingId: "falla", motivo: "socket hang up" }]);
+  });
+
+  it("sin AUTH_RESEND_KEY no marca remindedAt y no se confunde con un fallo de envío", async () => {
+    delete process.env.AUTH_RESEND_KEY;
+    findManyMock.mockResolvedValue([meeting()]);
+
+    const result = await sendMeetingReminders(now);
+
+    expect(result.sinCredenciales).toBe(true);
+    expect(result.fallos).toEqual([]);
+    expect(result.reminded).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

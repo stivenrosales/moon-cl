@@ -143,13 +143,32 @@ describe("runBookMatch", () => {
     affinityUserFindManyMock.mockReset();
     affinityUserBookFindManyMock.mockReset();
     affinityRatingFindManyMock.mockReset();
-    emailsSendMock.mockClear();
-    batchSendMock.mockClear();
+    // Se re-arman (no solo mockClear) porque varios tests encolan un
+    // mockResolvedValueOnce con error: mockClear no drena esa cola.
+    emailsSendMock.mockReset().mockResolvedValue({ data: { id: "e1" }, error: null });
+    batchSendMock.mockReset().mockResolvedValue({ data: { data: [] }, error: null });
     process.env.AUTH_RESEND_KEY = "re_test_key";
   });
 
   const MONDAY = new Date("2026-07-13T15:00:00.000Z");
   const NOT_MONDAY = new Date("2026-07-14T15:00:00.000Z");
+
+  /** Dos opt-in con un libro en común: afinidad real, pareja garantizada. */
+  function armarParejaConAfinidad(optIn: Array<{ id: string; name: string; email: string | null }>) {
+    userFindManyMock.mockImplementation(
+      async ({ where }: { where?: { isMatchOptIn?: boolean; id?: { in: string[] } } } = {}) => {
+        if (where?.isMatchOptIn) return optIn;
+        if (where?.id?.in) return where.id.in.map((id: string) => ({ id, favoriteGenres: ["Novela"] }));
+        return [];
+      },
+    );
+    affinityUserBookFindManyMock.mockResolvedValue(
+      optIn.map((u) => ({ userId: u.id, bookId: "b1" })),
+    );
+    affinityRatingFindManyMock.mockResolvedValue([]);
+    matchFindManyMock.mockResolvedValue([]);
+    matchCreateMock.mockResolvedValue({ id: "m1" });
+  }
 
   it("no corre ningún día que no sea lunes en America/Lima", async () => {
     const result = await runBookMatch(NOT_MONDAY);
@@ -254,5 +273,90 @@ describe("runBookMatch", () => {
     expect(result.skipped).toBe(false);
     if (!result.skipped) expect(result.matched).toBe(0);
     expect(matchCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("conserva el Match aunque el correo falle: la pareja ya existe en la base y se ve en la app", async () => {
+    // El Match es la fuente de verdad; el correo es solo el aviso. Borrarlo
+    // por un fallo de envío dejaría a la pareja sin match Y sin aviso.
+    armarParejaConAfinidad([
+      { id: "a", name: "Ana", email: "ana@example.com" },
+      { id: "b", name: "Beto", email: "beto@example.com" },
+    ]);
+    batchSendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "application_error", message: "saldo agotado" },
+    });
+
+    const result = await runBookMatch(MONDAY);
+
+    expect(matchCreateMock).toHaveBeenCalledTimes(1);
+    expect(result.skipped).toBe(false);
+    if (!result.skipped) {
+      expect(result.matched).toBe(1);
+      expect(result.emailsSent).toBe(0);
+      expect(result.fallos).toEqual([
+        { userAId: "a", userBId: "b", motivo: expect.stringContaining("saldo agotado") },
+      ]);
+    }
+  });
+
+  it("reporta el fallo también en el envío individual (una sola de las dos tiene email)", async () => {
+    armarParejaConAfinidad([
+      { id: "a", name: "Ana", email: "ana@example.com" },
+      { id: "b", name: "Beto", email: null },
+    ]);
+    emailsSendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "invalid_parameter", message: "destinatario inválido" },
+    });
+
+    const result = await runBookMatch(MONDAY);
+
+    expect(emailsSendMock).toHaveBeenCalledTimes(1);
+    expect(batchSendMock).not.toHaveBeenCalled();
+    expect(result.skipped).toBe(false);
+    if (!result.skipped) {
+      expect(result.emailsSent).toBe(0);
+      expect(result.fallos).toEqual([
+        { userAId: "a", userBId: "b", motivo: expect.stringContaining("destinatario inválido") },
+      ]);
+    }
+  });
+
+  it("reporta la pareja a la que no se le pudo avisar porque ninguna de las dos tiene email", async () => {
+    armarParejaConAfinidad([
+      { id: "a", name: "Ana", email: null },
+      { id: "b", name: "Beto", email: null },
+    ]);
+
+    const result = await runBookMatch(MONDAY);
+
+    expect(matchCreateMock).toHaveBeenCalledTimes(1);
+    expect(emailsSendMock).not.toHaveBeenCalled();
+    expect(batchSendMock).not.toHaveBeenCalled();
+    expect(result.skipped).toBe(false);
+    if (!result.skipped) {
+      expect(result.emailsSent).toBe(0);
+      expect(result.fallos).toHaveLength(1);
+      expect(result.fallos[0].motivo).toMatch(/email/i);
+    }
+  });
+
+  it("sin AUTH_RESEND_KEY el Match se crea igual y no se reporta como fallo de envío", async () => {
+    delete process.env.AUTH_RESEND_KEY;
+    armarParejaConAfinidad([
+      { id: "a", name: "Ana", email: "ana@example.com" },
+      { id: "b", name: "Beto", email: "beto@example.com" },
+    ]);
+
+    const result = await runBookMatch(MONDAY);
+
+    expect(matchCreateMock).toHaveBeenCalledTimes(1);
+    expect(result.skipped).toBe(false);
+    if (!result.skipped) {
+      expect(result.emailsSent).toBe(0);
+      expect(result.fallos).toEqual([]);
+      expect(result.sinCredenciales).toBe(true);
+    }
   });
 });

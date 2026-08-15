@@ -9,13 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FollowButton } from "@/components/follow-button";
 import { routes } from "@/lib/routes";
-import { getInitials } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
 
-export interface MemberRow {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
+/**
+ * Extiende PersonaPublica y NO agrega el correo: este componente es cliente,
+ * así que todo lo que entra acá queda embebido en el HTML. El nombre visible
+ * y las iniciales llegan ya resueltos desde el servidor (ver
+ * lib/persona-publica.ts).
+ */
+export interface MemberRow extends PersonaPublica {
   isFollowing: boolean;
   booksInCommon: number;
   readingTitle: string | null;
@@ -31,13 +33,17 @@ interface MemberListProps {
 export function MemberList({ rows }: MemberListProps) {
   const [query, setQuery] = React.useState("");
 
+  // Se busca solo por el nombre visible, ya no por correo. Es una decisión de
+  // producto tomada a conciencia: filtrar por correo en el cliente OBLIGA a
+  // mandar el correo de todas las socias al navegador, que era justamente el
+  // leak. No se pierde tanto como parece — para quien no tiene nombre propio,
+  // `nombre` ES el usuario de su correo, que es lo que la fila ya pintaba.
+  // La alternativa (buscar en el servidor con una action) no se justifica para
+  // un directorio de club: son decenas de filas, no miles.
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((r) => {
-      const haystack = [r.name ?? "", r.email ?? ""].join(" ").toLowerCase();
-      return haystack.includes(q);
-    });
+    return rows.filter((r) => (r.nombre ?? "").toLowerCase().includes(q));
   }, [rows, query]);
 
   if (rows.length === 0) {
@@ -59,7 +65,7 @@ export function MemberList({ rows }: MemberListProps) {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre o correo…"
+          placeholder="Buscar por nombre…"
           className="h-9 pl-9"
           aria-label="Buscar miembro"
         />
@@ -76,14 +82,14 @@ export function MemberList({ rows }: MemberListProps) {
               <Link href={routes.persona(m.id)} className="focus-ring shrink-0 rounded-full">
                 <Avatar className="h-9 w-9">
                   {m.image ? <AvatarImage src={m.image} alt="" /> : null}
-                  <AvatarFallback className="text-xs">{getInitials(m.name, m.email)}</AvatarFallback>
+                  <AvatarFallback className="text-xs">{m.iniciales}</AvatarFallback>
                 </Avatar>
               </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <Link href={routes.persona(m.id)} className="focus-ring min-w-0 rounded-sm">
                     <p className="truncate text-sm font-medium hover:text-primary transition-colors">
-                      {m.name ?? m.email?.split("@")[0]}
+                      {m.nombre}
                     </p>
                   </Link>
                   {m.veryAffine ? (

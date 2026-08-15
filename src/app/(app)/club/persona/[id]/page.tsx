@@ -14,6 +14,7 @@ import { ProfileStat } from "@/components/profile-stat";
 import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { inicioDeAnioLima } from "@/lib/lima-date";
 import type { Role } from "@prisma/client";
 
 const roleLabel: Record<Role, string> = {
@@ -46,7 +47,12 @@ export default async function PerfilPublicoPage({
         where: {
           userId: id,
           status: "FINISHED",
-          finishedAt: { gte: new Date(new Date().getFullYear(), 0, 1) },
+          // inicioDeAnioLima() en vez de new Date(getFullYear(), 0, 1): el
+          // contenedor corre en UTC, que cruza a enero ANTES que Lima (Lima
+          // va detrás). Sin la zona horaria explícita, el 31 de diciembre
+          // después de las 19:00 hora Lima el corte saltaba al año
+          // siguiente y este contador caía a 0 (ver lima-date.ts).
+          finishedAt: { gte: inicioDeAnioLima(new Date()) },
         },
       }),
       db.userBook.findMany({

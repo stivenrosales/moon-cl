@@ -94,6 +94,16 @@ const CAMPOS_VACIOS: CamposLibro = {
   description: "",
 };
 
+// "Sin resultados" y "la búsqueda falló" son estados distintos (ver
+// BookSearchResult en @/lib/google-books): antes un 429 de Google Books se
+// mostraba igual que "ese libro no existe". Un solo discriminated union en
+// vez de results/searching/error sueltos evita que se puedan pisar entre sí.
+type EstadoBusqueda =
+  | { tipo: "vacio" }
+  | { tipo: "buscando" }
+  | { tipo: "ok"; books: BookCandidate[] }
+  | { tipo: "error" };
+
 function AddBookForm({
   hayRondaAbierta,
   onClose,
@@ -108,8 +118,7 @@ function AddBookForm({
 
   // Paso 1 — modo "Buscar"
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<BookCandidate[]>([]);
-  const [searching, setSearching] = React.useState(false);
+  const [estado, setEstado] = React.useState<EstadoBusqueda>({ tipo: "vacio" });
 
   // Paso 2 — campos editables. Se precargan al elegir un candidato de la
   // búsqueda; quedan vacíos si el origen es "a mano".
@@ -126,24 +135,31 @@ function AddBookForm({
   const [coverPreviewUrl, setCoverPreviewUrl] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const buscar = React.useCallback(async (q: string) => {
+    setEstado({ tipo: "buscando" });
+    try {
+      const resultado = await searchBooksAction(q);
+      setEstado(
+        resultado.status === "error"
+          ? { tipo: "error" }
+          : { tipo: "ok", books: resultado.books },
+      );
+    } catch {
+      // La action en sí no debería rechazar (searchBooks nunca lanza), pero
+      // si falla la llamada RPC es el mismo caso: la búsqueda falló, no que
+      // no haya resultados.
+      setEstado({ tipo: "error" });
+    }
+  }, []);
+
   React.useEffect(() => {
     if (modo !== "buscar" || !query || query.length < 2) {
-      setResults([]);
+      setEstado({ tipo: "vacio" });
       return;
     }
-    const handle = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const items = await searchBooksAction(query);
-        setResults(items);
-      } catch {
-        toast.error("No se pudo buscar libros");
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
+    const handle = setTimeout(() => buscar(query), 350);
     return () => clearTimeout(handle);
-  }, [modo, query]);
+  }, [modo, query, buscar]);
 
   // Libera el objectURL del preview cada vez que cambia (o al desmontar el
   // form al cerrar el diálogo). Sin esto la imagen elegida se queda viva en
@@ -306,14 +322,14 @@ function AddBookForm({
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-10"
                 />
-                {searching ? (
+                {estado.tipo === "buscando" ? (
                   <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                 ) : null}
               </div>
 
-              {results.length > 0 ? (
+              {estado.tipo === "ok" && estado.books.length > 0 ? (
                 <ul className="-mr-2 max-h-[300px] space-y-2 overflow-y-auto pr-2">
-                  {results.map((book) => (
+                  {estado.books.map((book) => (
                     <li key={book.googleBooksId}>
                       <button
                         type="button"
@@ -332,15 +348,25 @@ function AddBookForm({
                     </li>
                   ))}
                 </ul>
-              ) : query.length >= 2 && !searching ? (
+              ) : estado.tipo === "error" ? (
+                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No pudimos completar la búsqueda. Puede ser un problema temporal con
+                    Google Books o Open Library — también puedes cargarlo a mano.
+                  </p>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => buscar(query)}>
+                    Reintentar
+                  </Button>
+                </div>
+              ) : estado.tipo === "ok" ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   Sin resultados. Prueba otro título o cárgalo a mano.
                 </p>
-              ) : (
+              ) : estado.tipo === "vacio" ? (
                 <p className="py-5 text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
                   ✦ Empieza a escribir el título o autor ✦
                 </p>
-              )}
+              ) : null}
             </div>
           ) : (
             <p className="py-6 text-center text-sm text-muted-foreground">

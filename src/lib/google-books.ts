@@ -10,6 +10,26 @@ export interface BookCandidate {
   isbn: string | null;
 }
 
+/**
+ * Resultado de una búsqueda de libros. "sin resultados" (`ok` con
+ * `books: []`) y "la búsqueda falló" (`error`) son estados DISTINTOS a
+ * propósito.
+ *
+ * Antes searchBooks devolvía `BookCandidate[]` a secas: un 429 de Google
+ * Books (la cuota anónima se quema rápido sin GOOGLE_BOOKS_API_KEY), un
+ * timeout o un JSON inválido colapsaban al mismo array vacío que "no existe
+ * ese libro", y la usuaria se iba pensando que el libro no existía cuando
+ * en realidad la búsqueda se había caído.
+ *
+ * `degradado` marca el caso intermedio: una fuente respondió y la otra no.
+ * Eso NO es un fallo — sigue siendo `ok`, solo que con menos cobertura de
+ * catálogo — así que nunca se confunde con `error`. Solo es `error` cuando
+ * NINGUNA de las dos fuentes pudo responder.
+ */
+export type BookSearchResult =
+  | { status: "ok"; books: BookCandidate[]; degradado: boolean }
+  | { status: "error" };
+
 const OL_ENDPOINT = "https://openlibrary.org/search.json";
 const GB_ENDPOINT = "https://www.googleapis.com/books/v1/volumes";
 
@@ -90,19 +110,60 @@ function enteroEnRango(valor: number | null, min: number, max: number): number |
  * Prioriza Google Books (metadata más rica y limpia) y rellena con Open
  * Library para mejorar cobertura de catálogo en español y libros menos
  * comerciales.
+ *
+ * Ver BookSearchResult: "sin resultados" y "la búsqueda falló" viajan como
+ * estados distintos hasta la usuaria, y el fallo se loguea siempre —
+ * también en producción, que es justo donde antes nadie se enteraba.
  */
-export async function searchBooks(query: string, max = 8): Promise<BookCandidate[]> {
+export async function searchBooks(query: string, max = 8): Promise<BookSearchResult> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { status: "ok", books: [], degradado: false };
 
-  const [gbResults, olResults] = await Promise.allSettled([
+  const [gbSettled, olSettled] = await Promise.allSettled([
     searchGoogleBooks(trimmed, max),
     searchOpenLibrary(trimmed, max),
   ]);
 
-  const gb = gbResults.status === "fulfilled" ? gbResults.value : [];
-  const ol = olResults.status === "fulfilled" ? olResults.value : [];
+  const gb = resolverFuente(gbSettled, "Google Books");
+  const ol = resolverFuente(olSettled, "Open Library");
 
+  // Ninguna fuente pudo responder: esto es un fallo de la búsqueda, no
+  // ausencia del libro en el catálogo. Confundir los dos es el bug original.
+  if (!gb.ok && !ol.ok) {
+    return { status: "error" };
+  }
+
+  const books = mezclarCandidatos(gb.ok ? gb.books : [], ol.ok ? ol.books : [], max);
+  return { status: "ok", books, degradado: !gb.ok || !ol.ok };
+}
+
+/** Resultado interno de UNA fuente: no distingue "sin datos" de "falló". */
+type ResultadoFuente = { ok: true; books: BookCandidate[] } | { ok: false };
+
+function resolverFuente(
+  settled: PromiseSettledResult<ResultadoFuente>,
+  fuente: string,
+): ResultadoFuente {
+  if (settled.status === "fulfilled") return settled.value;
+  // La promesa se rechazó antes de llegar a un status HTTP: timeout, DNS,
+  // JSON inválido en la respuesta. Se loguea siempre, también en
+  // producción — antes este aviso estaba condicionado a
+  // NODE_ENV !== "production" y por eso nadie se enteraba nunca.
+  // eslint-disable-next-line no-console
+  console.error(`[google-books] ${fuente} falló: ${String(settled.reason)}`);
+  return { ok: false };
+}
+
+/**
+ * Combina resultados de ambas fuentes con dedup por ISBN (o por
+ * título+autor si no hay ISBN), priorizando Google Books. Pura y
+ * testeable: no toca red, solo decide sobre listas ya cargadas.
+ */
+export function mezclarCandidatos(
+  gb: BookCandidate[],
+  ol: BookCandidate[],
+  max: number,
+): BookCandidate[] {
   const seen = new Set<string>();
   const merged: BookCandidate[] = [];
   for (const list of [gb, ol]) {
@@ -145,7 +206,7 @@ interface GBVolumeItem {
   volumeInfo: GBVolumeInfo;
 }
 
-async function searchGoogleBooks(query: string, max: number): Promise<BookCandidate[]> {
+async function searchGoogleBooks(query: string, max: number): Promise<ResultadoFuente> {
   const params = new URLSearchParams({
     q: query,
     maxResults: String(Math.min(40, Math.max(1, max + 4))),
@@ -158,17 +219,22 @@ async function searchGoogleBooks(query: string, max: number): Promise<BookCandid
   const res = await fetch(`${GB_ENDPOINT}?${params.toString()}`, {
     cache: "no-store",
   });
-  if (res.status === 429 && process.env.NODE_ENV !== "production") {
-    // Quota anónima de Google Books quemada — configura GOOGLE_BOOKS_API_KEY.
+  if (!res.ok) {
+    // Se loguea SIEMPRE, también en producción — antes esto estaba
+    // condicionado a NODE_ENV !== "production" (y encima solo para 429), así
+    // que nadie se enteraba de que la cuota anónima de Google Books se había
+    // quemado hasta que una usuaria reportaba "no encuentro ningún libro".
     // eslint-disable-next-line no-console
-    console.warn("[google-books] 429 quota exceeded — set GOOGLE_BOOKS_API_KEY");
+    console.error(
+      `[google-books] Google Books respondió ${res.status} — la fuente se descarta de la búsqueda (configura GOOGLE_BOOKS_API_KEY si es 429)`,
+    );
+    return { ok: false };
   }
-  if (!res.ok) return [];
 
   const data = (await res.json()) as { items?: GBVolumeItem[] };
-  if (!data.items) return [];
+  if (!data.items) return { ok: true, books: [] };
 
-  return data.items
+  const books = data.items
     .filter((it) => it.volumeInfo?.title)
     .map<BookCandidate>((item) => {
       const v = item.volumeInfo;
@@ -194,6 +260,7 @@ async function searchGoogleBooks(query: string, max: number): Promise<BookCandid
         isbn,
       });
     });
+  return { ok: true, books };
 }
 
 function pickGoogleCover(volumeId: string, links?: GBVolumeInfo["imageLinks"]): string | null {
@@ -226,7 +293,7 @@ interface OLDoc {
   edition_key?: string[];
 }
 
-async function searchOpenLibrary(query: string, max: number): Promise<BookCandidate[]> {
+async function searchOpenLibrary(query: string, max: number): Promise<ResultadoFuente> {
   const params = new URLSearchParams({
     q: query,
     limit: String(Math.min(20, max + 4)),
@@ -239,12 +306,21 @@ async function searchOpenLibrary(query: string, max: number): Promise<BookCandid
     },
     cache: "no-store",
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    // Mismo criterio que Google Books: se loguea siempre, también en
+    // producción, para que un fallo de esta fuente no se disfrace de "el
+    // libro no existe".
+    // eslint-disable-next-line no-console
+    console.error(
+      `[google-books] Open Library respondió ${res.status} — la fuente se descarta de la búsqueda`,
+    );
+    return { ok: false };
+  }
 
   const data = (await res.json()) as { docs?: OLDoc[] };
-  if (!data.docs) return [];
+  if (!data.docs) return { ok: true, books: [] };
 
-  return data.docs
+  const books = data.docs
     .filter((d) => d.title)
     .map<BookCandidate>((d) => sanearCandidato({
       googleBooksId: `ol:${d.key.replace(/^\/works\//, "")}`,
@@ -260,6 +336,7 @@ async function searchOpenLibrary(query: string, max: number): Promise<BookCandid
       publishedYear: d.first_publish_year ?? null,
       isbn: d.isbn?.[0] ?? null,
     }));
+  return { ok: true, books };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

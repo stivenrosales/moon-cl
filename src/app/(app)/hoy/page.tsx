@@ -14,6 +14,7 @@ import { formatDateTime, relativeTime } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { routes } from "@/lib/routes";
 import { shouldSuppressHeroNudge } from "@/lib/hero-nudge";
+import { fechaDiscretaLima } from "@/lib/lima-date";
 import { loadToday } from "@/server/services/today";
 import { loadUrgency, type UrgencySlot } from "@/server/services/urgency-queue";
 import { loadFeed } from "@/server/services/feed";
@@ -23,19 +24,6 @@ export const dynamic = "force-dynamic";
 
 const SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 const FEED_PREVIEW = 3;
-
-/** "Jueves 16 de julio · 21:04", en minúscula-a-mayúscula manual porque
- * Intl.DateTimeFormat siempre devuelve el día de la semana en minúscula. */
-function fechaDiscreta(date: Date): string {
-  const weekday = new Intl.DateTimeFormat("es-PE", { weekday: "long" }).format(date);
-  const dayMonth = new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "long" }).format(date);
-  const time = new Intl.DateTimeFormat("es-PE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${dayMonth} · ${time}`;
-}
 
 export default async function HoyPage() {
   const session = await getSession();
@@ -154,7 +142,7 @@ export default async function HoyPage() {
 
   return (
     <div className="space-y-5 md:space-y-7">
-      <p className="text-sm text-muted-foreground">{fechaDiscreta(now)}</p>
+      <p className="text-sm text-muted-foreground">{fechaDiscretaLima(now)}</p>
 
       <HeroCard hero={hero} />
 

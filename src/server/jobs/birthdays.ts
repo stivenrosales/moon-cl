@@ -45,9 +45,25 @@ type BirthdayUser = {
 };
 
 /**
+ * Resultado de un intento de envío. Tres estados DISTINTOS a propósito:
+ * "sin-credenciales" (dev/local sin AUTH_RESEND_KEY) no es un fallo de
+ * envío y no debe ensuciar el reporte de errores del cron, pero tampoco es
+ * un éxito — no se saludó a nadie.
+ */
+type ResultadoEnvio =
+  | { estado: "enviado" }
+  | { estado: "sin-credenciales" }
+  | { estado: "fallido"; motivo: string };
+
+/**
  * Saluda a quienes cumplen años hoy (America/Lima). El saludo es privado:
  * solo llega al cumpleañero, nunca se anuncia al resto del club — decisión
  * pendiente de confirmar con el cliente (ver docs/pendientes).
+ *
+ * `sent` cuenta saludos que Resend aceptó, no intentos: el SDK NO lanza
+ * ante un error de la API (devuelve { data, error }), así que antes un
+ * dominio sin verificar o un rate limit se contaba como envío exitoso y el
+ * cron reportaba todo en verde. Los rechazos viajan en `fallos`.
  *
  * Pensado para ser invocado desde el cron dispatcher diario
  * (src/app/api/cron/daily/route.ts). Recibe `now` para tests deterministas.
@@ -61,27 +77,50 @@ export async function sendBirthdayGreetings(now: Date = new Date()) {
   const celebrants = users.filter((u) => u.birthday && isBirthdayToday(u.birthday, now));
 
   let sent = 0;
+  const fallos: Array<{ userId: string; motivo: string }> = [];
+  let sinCredenciales = false;
+
   for (const user of celebrants) {
     if (!user.email) continue;
-    await sendBirthdayEmail(user);
-    sent++;
+
+    const envio = await sendBirthdayEmail({ name: user.name, email: user.email });
+
+    if (envio.estado === "enviado") sent++;
+    // Se guarda el id, no el email: este resultado se serializa entero en la
+    // respuesta del cron y termina en los logs del servidor.
+    else if (envio.estado === "fallido") fallos.push({ userId: user.id, motivo: envio.motivo });
+    else sinCredenciales = true;
   }
 
-  return { celebrants: celebrants.length, sent };
+  return { celebrants: celebrants.length, sent, fallos, sinCredenciales };
 }
 
-async function sendBirthdayEmail(user: { name: string | null; email: string | null }) {
+async function sendBirthdayEmail(user: { name: string | null; email: string }): Promise<ResultadoEnvio> {
   const apiKey = process.env.AUTH_RESEND_KEY;
-  if (!apiKey || !user.email) return; // sin key configurada (dev/local): no rompe el job, solo no envía
+  if (!apiKey) return { estado: "sin-credenciales" }; // dev/local: no rompe el job, solo no envía
 
   const resend = new Resend(apiKey);
   const from = process.env.EMAIL_FROM ?? "Moon Club <onboarding@resend.dev>";
 
-  await resend.emails.send({
-    from,
-    to: user.email,
-    subject: "🎂 ¡Feliz cumpleaños!",
-    html: buildBirthdayHtml({ name: user.name }),
-    text: buildBirthdayText({ name: user.name }),
-  });
+  try {
+    // Desestructurar `error` es obligatorio: el SDK devuelve el fallo, no lo
+    // lanza. Mismo patrón que sendMagicLinkEmail en src/lib/email.ts.
+    const { error } = await resend.emails.send({
+      from,
+      to: user.email,
+      subject: "🎂 ¡Feliz cumpleaños!",
+      html: buildBirthdayHtml({ name: user.name }),
+      text: buildBirthdayText({ name: user.name }),
+    });
+
+    if (error) return { estado: "fallido", motivo: `${error.name}: ${error.message}` };
+    return { estado: "enviado" };
+  } catch (error) {
+    // Por red/timeout el SDK sí puede lanzar: se traduce al mismo estado
+    // para que un cumpleañero con problemas no deje sin saludo al resto.
+    return {
+      estado: "fallido",
+      motivo: error instanceof Error ? error.message : "Error desconocido",
+    };
+  }
 }

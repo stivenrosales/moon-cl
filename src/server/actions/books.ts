@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { searchBooks, type BookCandidate } from "@/lib/google-books";
+import { searchBooks, type BookSearchResult } from "@/lib/google-books";
 import { routes } from "@/lib/routes";
 import { bookUpdateSchema, createBookSchema } from "@/lib/validators";
 import { requireUser, requireModerator } from "@/server/auth-helpers";
 import { findOrCreateBook } from "@/server/services/books";
 import { setCurrentBookTx } from "@/server/services/club";
 
-export async function searchBooksAction(query: string): Promise<BookCandidate[]> {
+export async function searchBooksAction(query: string): Promise<BookSearchResult> {
   await requireUser();
   return searchBooks(query, 8);
 }

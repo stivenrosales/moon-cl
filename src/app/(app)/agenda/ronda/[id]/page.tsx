@@ -11,6 +11,7 @@ import { SuggestBookDialog } from "@/components/suggest-book-dialog";
 import { RoundSuggestionsList } from "@/components/round-suggestions-list";
 import { formatDate } from "@/lib/utils";
 import { routes } from "@/lib/routes";
+import { aPersonaPublica } from "@/lib/persona-publica";
 
 export default async function RondaPage({
   params,
@@ -141,12 +142,9 @@ export default async function RondaPage({
                 coverUrl: s.book.coverUrl,
                 publishedYear: s.book.publishedYear,
               },
-              user: {
-                id: s.user.id,
-                name: s.user.name,
-                email: s.user.email,
-                image: s.user.image,
-              },
+              // El correo de quien sugirió se queda en el servidor:
+              // RoundSuggestionsList es cliente y lo dejaría en el HTML.
+              user: aPersonaPublica(s.user),
             }))}
           />
         )}

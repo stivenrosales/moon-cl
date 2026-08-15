@@ -94,6 +94,17 @@ export function pairUsers(scores: ScoredPair[], recentPairs: ReadonlySet<string>
 type MatchUser = { id: string; name: string | null; email: string | null };
 
 /**
+ * Resultado de un intento de envío. Tres estados DISTINTOS a propósito:
+ * "sin-credenciales" (dev/local sin AUTH_RESEND_KEY) no es un fallo de
+ * envío y no debe ensuciar el reporte de errores del cron, pero tampoco es
+ * un éxito — no se avisó a nadie.
+ */
+type ResultadoEnvio =
+  | { estado: "enviado"; enviados: number }
+  | { estado: "sin-credenciales" }
+  | { estado: "fallido"; motivo: string };
+
+/**
  * Book Match semanal: SOLO corre los lunes en America/Lima (guard de zona
  * horaria en vez de un cron nuevo — Vercel Hobby permite máx. 2 crons y ya
  * están ocupados; ver src/app/api/cron/daily/route.ts, que llama a este job
@@ -159,6 +170,9 @@ export async function runBookMatch(now: Date = new Date()) {
   const usersById = new Map(optedIn.map((u) => [u.id, u]));
 
   let emailsSent = 0;
+  const fallos: Array<{ userAId: string; userBId: string; motivo: string }> = [];
+  let sinCredenciales = false;
+
   for (const match of matches) {
     await db.match.create({
       data: { userAId: match.userAId, userBId: match.userBId, weekOf, score: match.score },
@@ -169,15 +183,36 @@ export async function runBookMatch(now: Date = new Date()) {
     const userB = usersById.get(match.userBId);
     if (!affinity || !userA || !userB) continue;
 
-    emailsSent += await sendMatchEmails(userA, userB, affinity);
+    const envio = await sendMatchEmails(userA, userB, affinity);
+
+    // Si el correo falla, el Match creado arriba SE QUEDA. El Match es la
+    // fuente de verdad —la card de /comunidad lo muestra igual, sin correo
+    // de por medio— y el email es solo el aviso: borrarlo dejaría a la
+    // pareja sin match Y sin aviso. Tampoco se reintenta desde acá: este
+    // job no es idempotente (db.match.create dentro del loop, sin
+    // transacción), así que una segunda pasada el mismo lunes reventaría
+    // con violación de constraint tras duplicar los correos que sí
+    // salieron. El fallo viaja en el resultado para que un humano decida
+    // si reenvía a mano.
+    if (envio.estado === "enviado") {
+      emailsSent += envio.enviados;
+    } else if (envio.estado === "fallido") {
+      fallos.push({ userAId: match.userAId, userBId: match.userBId, motivo: envio.motivo });
+    } else {
+      sinCredenciales = true;
+    }
   }
 
-  return { skipped: false as const, weekOf, matched: matches.length, emailsSent };
+  return { skipped: false as const, weekOf, matched: matches.length, emailsSent, fallos, sinCredenciales };
 }
 
-async function sendMatchEmails(userA: MatchUser, userB: MatchUser, affinity: AffinityResult) {
+async function sendMatchEmails(
+  userA: MatchUser,
+  userB: MatchUser,
+  affinity: AffinityResult,
+): Promise<ResultadoEnvio> {
   const apiKey = process.env.AUTH_RESEND_KEY;
-  if (!apiKey) return 0; // sin key configurada (dev/local): no rompe el job, solo no envía
+  if (!apiKey) return { estado: "sin-credenciales" }; // dev/local: no rompe el job, solo no envía
 
   const resend = new Resend(apiKey);
   const from = process.env.EMAIL_FROM ?? "Moon Club <onboarding@resend.dev>";
@@ -196,11 +231,33 @@ async function sendMatchEmails(userA: MatchUser, userB: MatchUser, affinity: Aff
       text: buildBookMatchText({ otherName: other.name, affinity, ctaUrl: `${baseUrl}/mensajes/${other.id}` }),
     }));
 
-  if (payloads.length === 0) return 0;
-  if (payloads.length === 1) {
-    await resend.emails.send(payloads[0]);
-    return 1;
+  // Pareja creada a la que no se le puede avisar: cuenta como fallo, no
+  // como envío de cero correos. Que un Match exista y nadie se entere es
+  // justo lo que este job dejó de hacer en silencio.
+  if (payloads.length === 0) {
+    return { estado: "fallido", motivo: "ninguna de las dos personas tiene email" };
   }
-  await resend.batch.send(payloads);
-  return payloads.length;
+
+  try {
+    // El SDK de Resend no lanza ante un error de la API: devuelve
+    // { data, error } (CreateEmailResponse / CreateBatchResponse). Hay que
+    // desestructurar `error` sí o sí — mismo patrón que sendMagicLinkEmail
+    // en src/lib/email.ts. batch.send tampoco reporta fallos por
+    // destinatario: su error es de la request entera, todo o nada.
+    const { error } =
+      payloads.length === 1
+        ? await resend.emails.send(payloads[0])
+        : await resend.batch.send(payloads);
+
+    if (error) return { estado: "fallido", motivo: `${error.name}: ${error.message}` };
+    return { estado: "enviado", enviados: payloads.length };
+  } catch (error) {
+    // Por red/timeout el SDK sí puede lanzar. Se traduce al mismo estado
+    // porque acá dejar escapar la excepción es carísimo: aborta el loop y
+    // las parejas que faltaban se quedan sin Match hasta el lunes siguiente.
+    return {
+      estado: "fallido",
+      motivo: error instanceof Error ? error.message : "Error desconocido",
+    };
+  }
 }

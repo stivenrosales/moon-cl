@@ -76,7 +76,9 @@ describe("isBirthdayToday", () => {
 describe("sendBirthdayGreetings", () => {
   beforeEach(() => {
     findManyMock.mockReset();
-    emailsSendMock.mockClear();
+    // Se re-arma (no solo mockClear) porque hay tests que encolan un
+    // mockResolvedValueOnce con error: mockClear no drena esa cola.
+    emailsSendMock.mockReset().mockResolvedValue({ data: { id: "e1" }, error: null });
     process.env.AUTH_RESEND_KEY = "re_test_key";
   });
 
@@ -87,7 +89,7 @@ describe("sendBirthdayGreetings", () => {
 
     const result = await sendBirthdayGreetings(new Date("2026-07-10T12:00:00.000Z"));
 
-    expect(result).toEqual({ celebrants: 0, sent: 0 });
+    expect(result).toEqual({ celebrants: 0, sent: 0, fallos: [], sinCredenciales: false });
     expect(emailsSendMock).not.toHaveBeenCalled();
   });
 
@@ -99,7 +101,7 @@ describe("sendBirthdayGreetings", () => {
 
     const result = await sendBirthdayGreetings(new Date("2026-07-10T12:00:00.000Z"));
 
-    expect(result).toEqual({ celebrants: 1, sent: 1 });
+    expect(result).toEqual({ celebrants: 1, sent: 1, fallos: [], sinCredenciales: false });
     expect(emailsSendMock).toHaveBeenCalledTimes(1);
     expect(emailsSendMock).toHaveBeenCalledWith(
       expect.objectContaining({ to: "ana@example.com" }),
@@ -114,5 +116,52 @@ describe("sendBirthdayGreetings", () => {
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({ where: { birthday: { not: null } } }),
     );
+  });
+
+  it("no cuenta como enviado un saludo que Resend rechazó, y lo reporta", async () => {
+    // El SDK no lanza: devuelve { data: null, error }. Sin mirar `error`,
+    // un rate limit se veía idéntico a un envío exitoso.
+    findManyMock.mockResolvedValue([
+      { id: "u1", name: "Ana", email: "ana@example.com", birthday: new Date("1990-07-10T00:00:00.000Z") },
+    ]);
+    emailsSendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "rate_limit_exceeded", message: "demasiados envíos" },
+    });
+
+    const result = await sendBirthdayGreetings(new Date("2026-07-10T12:00:00.000Z"));
+
+    expect(result.celebrants).toBe(1);
+    expect(result.sent).toBe(0);
+    expect(result.fallos).toEqual([
+      { userId: "u1", motivo: expect.stringContaining("demasiados envíos") },
+    ]);
+  });
+
+  it("un saludo que falla no impide saludar al resto de cumpleañeros del día", async () => {
+    findManyMock.mockResolvedValue([
+      { id: "u1", name: "Ana", email: "ana@example.com", birthday: new Date("1990-07-10T00:00:00.000Z") },
+      { id: "u2", name: "Beto", email: "beto@example.com", birthday: new Date("1988-07-10T00:00:00.000Z") },
+    ]);
+    emailsSendMock.mockRejectedValueOnce(new Error("socket hang up"));
+
+    const result = await sendBirthdayGreetings(new Date("2026-07-10T12:00:00.000Z"));
+
+    expect(result.celebrants).toBe(2);
+    expect(result.sent).toBe(1);
+    expect(result.fallos).toEqual([{ userId: "u1", motivo: "socket hang up" }]);
+  });
+
+  it("sin AUTH_RESEND_KEY no cuenta el saludo como enviado ni como fallo de envío", async () => {
+    delete process.env.AUTH_RESEND_KEY;
+    findManyMock.mockResolvedValue([
+      { id: "u1", name: "Ana", email: "ana@example.com", birthday: new Date("1990-07-10T00:00:00.000Z") },
+    ]);
+
+    const result = await sendBirthdayGreetings(new Date("2026-07-10T12:00:00.000Z"));
+
+    expect(result.sent).toBe(0);
+    expect(result.fallos).toEqual([]);
+    expect(result.sinCredenciales).toBe(true);
   });
 });

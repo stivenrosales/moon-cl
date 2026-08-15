@@ -29,19 +29,21 @@ interface BookOption {
   title: string;
 }
 
+interface MeetingInfo {
+  id: string;
+  title: string;
+  description: string | null;
+  bookId: string | null;
+  type: MeetingType;
+  startsAt: Date;
+  endsAt: Date | null;
+  location: string | null;
+  meetingUrl: string | null;
+  isVirtual: boolean;
+}
+
 interface MeetingEditDialogProps {
-  meeting: {
-    id: string;
-    title: string;
-    description: string | null;
-    bookId: string | null;
-    type: MeetingType;
-    startsAt: Date;
-    endsAt: Date | null;
-    location: string | null;
-    meetingUrl: string | null;
-    isVirtual: boolean;
-  };
+  meeting: MeetingInfo;
   books: BookOption[];
   /** Tras eliminar, a dónde navegar. Si se omite, no navega (p. ej. lista del admin). */
   redirectOnDeleteTo?: string;
@@ -53,8 +55,58 @@ function dateToInput(d: Date) {
 }
 
 export function MeetingEditDialog({ meeting, books, redirectOnDeleteTo }: MeetingEditDialogProps) {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  // Contador de aperturas: es la key del formulario, así que abrir el
+  // diálogo lo REMONTA y sus 9 campos vuelven a derivarse de `meeting`.
+  // Antes vivían en un componente que nunca se desmonta: dejabas a medias
+  // un cambio de fecha, cerrabas sin guardar, reabrías, tocabas otra cosa
+  // y guardabas… y movías la reunión del club sin querer.
+  //
+  // No alcanza con que Radix desmonte DialogContent al cerrar: durante la
+  // animación de salida sigue montado, y reabrir dentro de esa ventana
+  // reusaría la instancia vieja.
+  const [aperturas, setAperturas] = React.useState(0);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(siguiente) => {
+        if (siguiente) setAperturas((n) => n + 1);
+        setOpen(siguiente);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="shrink-0">
+          <Pencil className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Editar</span>
+          <span className="sm:hidden sr-only">Editar reunión</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <MeetingEditForm
+          key={aperturas}
+          meeting={meeting}
+          books={books}
+          redirectOnDeleteTo={redirectOnDeleteTo}
+          onClose={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MeetingEditForm({
+  meeting,
+  books,
+  redirectOnDeleteTo,
+  onClose,
+}: {
+  meeting: MeetingInfo;
+  books: BookOption[];
+  redirectOnDeleteTo?: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
   const [title, setTitle] = React.useState(meeting.title);
   const [description, setDescription] = React.useState(meeting.description ?? "");
   const [bookId, setBookId] = React.useState(meeting.bookId ?? "");
@@ -84,7 +136,7 @@ export function MeetingEditDialog({ meeting, books, redirectOnDeleteTo }: Meetin
         isVirtual,
       });
       toast.success("Reunión actualizada");
-      setOpen(false);
+      onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo guardar");
     } finally {
@@ -98,7 +150,7 @@ export function MeetingEditDialog({ meeting, books, redirectOnDeleteTo }: Meetin
     try {
       await deleteMeeting(meeting.id);
       toast.success("Reunión eliminada");
-      setOpen(false);
+      onClose();
       if (redirectOnDeleteTo) router.push(redirectOnDeleteTo);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo eliminar");
@@ -108,133 +160,124 @@ export function MeetingEditDialog({ meeting, books, redirectOnDeleteTo }: Meetin
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="shrink-0">
-          <Pencil className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Editar</span>
-          <span className="sm:hidden sr-only">Editar reunión</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Editar reunión</DialogTitle>
-          <DialogDescription>Cambia fecha, tipo, lugar o enlace.</DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Editar reunión</DialogTitle>
+        <DialogDescription>Cambia fecha, tipo, lugar o enlace.</DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-5">
+      <div className="space-y-5">
+        <Field>
+          <Label htmlFor="me-title">Título</Label>
+          <Input id="me-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field>
-            <Label htmlFor="me-title">Título</Label>
-            <Input id="me-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Label htmlFor="me-type">Tipo</Label>
+            <Select id="me-type" value={type} onChange={(e) => setType(e.target.value)}>
+              {MEETING_TYPE_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
           </Field>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field>
-              <Label htmlFor="me-type">Tipo</Label>
-              <Select id="me-type" value={type} onChange={(e) => setType(e.target.value)}>
-                {MEETING_TYPE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field>
-              <Label htmlFor="me-bookId" optional>Libro asociado</Label>
-              <Select id="me-bookId" value={bookId} onChange={(e) => setBookId(e.target.value)}>
-                <option value="">— Sin libro —</option>
-                {books.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.title}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field>
-              <Label htmlFor="me-startsAt">Inicio</Label>
-              <DateTimeInput
-                id="me-startsAt"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-              />
-              <FieldDescription>Si cambias la fecha, el recordatorio automático vuelve a activarse.</FieldDescription>
-            </Field>
-            <Field>
-              <Label htmlFor="me-endsAt" optional>Fin</Label>
-              <DateTimeInput
-                id="me-endsAt"
-                value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <Checkbox
-            checked={isVirtual}
-            onChange={(e) => setIsVirtual(e.currentTarget.checked)}
-            label="Reunión virtual"
-            description="Si se desactiva, pediremos una dirección física en lugar del enlace."
-          />
-
-          {isVirtual ? (
-            <Field>
-              <Label htmlFor="me-meetingUrl">Enlace</Label>
-              <Input
-                id="me-meetingUrl"
-                type="url"
-                value={meetingUrl}
-                onChange={(e) => setMeetingUrl(e.target.value)}
-                placeholder="https://meet.google.com/..."
-              />
-            </Field>
-          ) : (
-            <Field>
-              <Label htmlFor="me-location">Lugar</Label>
-              <Input
-                id="me-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Café de la luna, Calle 123"
-              />
-            </Field>
-          )}
-
           <Field>
-            <Label htmlFor="me-description" optional>Descripción</Label>
-            <Textarea
-              id="me-description"
-              rows={3}
-              maxLength={2000}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+            <Label htmlFor="me-bookId" optional>Libro asociado</Label>
+            <Select id="me-bookId" value={bookId} onChange={(e) => setBookId(e.target.value)}>
+              <option value="">— Sin libro —</option>
+              {books.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field>
+            <Label htmlFor="me-startsAt">Inicio</Label>
+            <DateTimeInput
+              id="me-startsAt"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+            />
+            <FieldDescription>Si cambias la fecha, el recordatorio automático vuelve a activarse.</FieldDescription>
+          </Field>
+          <Field>
+            <Label htmlFor="me-endsAt" optional>Fin</Label>
+            <DateTimeInput
+              id="me-endsAt"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
             />
           </Field>
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          <Button
-            variant="ghost"
-            disabled={deleting || submitting}
-            className="text-muted-foreground hover:text-destructive"
-            onClick={handleDelete}
-          >
-            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            Eliminar
+        <Checkbox
+          checked={isVirtual}
+          onChange={(e) => setIsVirtual(e.currentTarget.checked)}
+          label="Reunión virtual"
+          description="Si se desactiva, pediremos una dirección física en lugar del enlace."
+        />
+
+        {isVirtual ? (
+          <Field>
+            <Label htmlFor="me-meetingUrl">Enlace</Label>
+            <Input
+              id="me-meetingUrl"
+              type="url"
+              value={meetingUrl}
+              onChange={(e) => setMeetingUrl(e.target.value)}
+              placeholder="https://meet.google.com/..."
+            />
+          </Field>
+        ) : (
+          <Field>
+            <Label htmlFor="me-location">Lugar</Label>
+            <Input
+              id="me-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Café de la luna, Calle 123"
+            />
+          </Field>
+        )}
+
+        <Field>
+          <Label htmlFor="me-description" optional>Descripción</Label>
+          <Textarea
+            id="me-description"
+            rows={3}
+            maxLength={2000}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <DialogFooter className="sm:justify-between">
+        <Button
+          variant="ghost"
+          disabled={deleting || submitting}
+          className="text-muted-foreground hover:text-destructive"
+          onClick={handleDelete}
+        >
+          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          Eliminar
+        </Button>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
           </Button>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={submitting || deleting || !title.trim()}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Guardar cambios
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={handleSubmit} disabled={submitting || deleting || !title.trim()}>
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            Guardar cambios
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
   );
 }

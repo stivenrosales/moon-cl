@@ -14,6 +14,7 @@ import { formatDateTime, relativeTime } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { routes } from "@/lib/routes";
 import { shouldSuppressHeroNudge } from "@/lib/hero-nudge";
+import { aPersonaPublica } from "@/lib/persona-publica";
 import { fechaDiscretaLima } from "@/lib/lima-date";
 import { loadToday } from "@/server/services/today";
 import { loadUrgency, type UrgencySlot } from "@/server/services/urgency-queue";
@@ -218,7 +219,9 @@ export default async function HoyPage() {
               likeCount: weeklyQuote._count.likes,
               likedByViewer: weeklyQuote.likes.some((l) => l.userId === userId),
               book: weeklyQuote.book,
-              user: weeklyQuote.user,
+              // aPersonaPublica y no la fila cruda: QuoteCard es cliente y
+              // dejaría el correo de la autora embebido en el HTML de /hoy.
+              user: aPersonaPublica(weeklyQuote.user),
             }}
             currentUserId={userId}
             isModerator={isModerator}

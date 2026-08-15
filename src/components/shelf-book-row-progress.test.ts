@@ -53,10 +53,42 @@ describe("resolverFilaProgreso", () => {
     expect(resultado.texto).toBe("14% · pág. 45/320 · cap. 5");
   });
 
-  it("avance real sin pageCount igual pinta la barra y omite el detalle de página", () => {
+  it("avance real sin pageCount NO inventa un porcentaje ni pinta la barra: no hay proporción que calcular", () => {
     const resultado = resolverFilaProgreso(45, null, null);
+    // Bug: sin total de páginas, pageProgress(45, null) caía a 0 y esto
+    // quedaba como "con-progreso" con pct 0 y mostrarBarra true — una
+    // usuaria en la página 45 veía "0%" y una barra vacía. Hay avance
+    // real (página 45) pero no hay proporción: es un estado distinto de
+    // "con-progreso", no un caso especial de él.
+    expect(resultado.tipo).toBe("avance-sin-total");
+    expect(resultado.mostrarBarra).toBe(false);
+    expect(resultado.texto).not.toContain("0%");
+    expect(resultado.texto).not.toContain("%");
+    expect(resultado.texto).toContain("pág. 45");
+  });
+
+  it("avance real con capítulo pero sin pageCount incluye el capítulo en el detalle", () => {
+    const resultado = resolverFilaProgreso(45, 5, null);
+    expect(resultado.tipo).toBe("avance-sin-total");
+    expect(resultado.texto).toContain("pág. 45");
+    expect(resultado.texto).toContain("cap. 5");
+  });
+
+  it("pageCount 0 (defensivo: el saneo del catálogo ya lo convierte a null) se trata igual que sin total", () => {
+    // Un total de 0 no es una proporción calculable más que null: dividir
+    // por 0 no tiene sentido y el saneo de books.ts ya lo evita, pero esta
+    // función no debe confiar solo en eso.
+    const resultado = resolverFilaProgreso(45, null, 0);
+    expect(resultado.tipo).toBe("avance-sin-total");
+    expect(resultado.mostrarBarra).toBe(false);
+  });
+
+  it("página mayor que el total cap-ea el porcentaje en 100% y sigue pintando la barra", () => {
+    const resultado = resolverFilaProgreso(400, null, 320);
     expect(resultado.tipo).toBe("con-progreso");
     if (resultado.tipo !== "con-progreso") throw new Error("tipo inesperado");
-    expect(resultado.texto).not.toContain("pág.");
+    expect(resultado.mostrarBarra).toBe(true);
+    expect(resultado.pct).toBe(100);
+    expect(resultado.texto).toContain("pág. 400/320");
   });
 });

@@ -16,17 +16,22 @@ import { RatingHistogram } from "@/components/rating-histogram";
 import { StarRating } from "@/components/star-rating";
 import { CommentsSection, type CommentNode } from "@/components/comments-section";
 import { BookEditDialog } from "@/components/book-edit-dialog";
+// getInitials sigue acá porque "Avance del club" y "Reseñas del club" se
+// pintan dentro de este Server Component: ahí el correo no cruza a ningún
+// lado, se usa y se queda. El que cruzaba era el de los comentarios.
 import { formatDate, getInitials, pageProgress, relativeTime } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { routes } from "@/lib/routes";
+import { aPersonaPublica, type PersonaConCorreo } from "@/lib/persona-publica";
 import { gateComment, hasFinishedBook } from "@/server/services/comment-gating";
 
-interface RawCommentUser {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-}
+/**
+ * La fila cruda de Prisma, con correo incluido: vive solo dentro de este
+ * Server Component. Lo que cruza a <CommentsSection> (cliente) pasa antes
+ * por aPersonaPublica() — misma doctrina que gateComment(), que es de esta
+ * misma página: lo que el cliente no debe ver no sale del servidor.
+ */
+type RawCommentUser = PersonaConCorreo;
 
 interface RawComment {
   id: string;
@@ -69,7 +74,7 @@ function serializeComment(c: RawComment, ctx: GateCtx): CommentNode {
     isSpoiler: c.isSpoiler,
     isReflection: c.isReflection,
     createdAt: c.createdAt,
-    user: c.user,
+    user: aPersonaPublica(c.user),
     replies,
   };
 

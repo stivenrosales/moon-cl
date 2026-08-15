@@ -162,7 +162,10 @@ async function FrasesView() {
     likeCount: q._count.likes,
     likedByViewer: q.likes.some((l) => l.userId === userId),
     book: q.book,
-    user: q.user,
+    // Solo lo derivado: QuoteCard es cliente, así que mandar q.user entero
+    // publicaba el correo de TODA autora de frase en el HTML de
+    // /club?vista=frases — el directorio del club otra vez, por otra puerta.
+    user: aPersonaPublica(q.user),
   }));
 
   const shareableBooks = dedupeById([

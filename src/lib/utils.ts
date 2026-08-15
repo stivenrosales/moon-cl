@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { LIMA_TIMEZONE } from "@/lib/lima-date";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -13,17 +14,27 @@ export function getInitials(name?: string | null, email?: string | null) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+// Las tres funciones de abajo formatean en America/Lima por defecto, no en
+// el huso del proceso: el contenedor corre en UTC (ningún Dockerfile,
+// docker-compose ni workflow de CI fija TZ) y sin timeZone explícito
+// Intl.DateTimeFormat usa ese UTC del proceso, adelantando fecha/hora entre
+// las 19:00 y las 23:59 hora Lima. `opts` se aplica DESPUÉS del default a
+// propósito: quien necesite otro huso (p. ej. perfil/page.tsx con el
+// cumpleaños, que es @db.Date y no un instante) lo pisa pasando su propio
+// `timeZone` en `opts`.
+
 export function formatDate(date: Date | string, opts?: Intl.DateTimeFormatOptions) {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("es-ES", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: LIMA_TIMEZONE,
     ...opts,
   }).format(d);
 }
 
-export function formatDateTime(date: Date | string) {
+export function formatDateTime(date: Date | string, opts?: Intl.DateTimeFormatOptions) {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("es-ES", {
     day: "numeric",
@@ -31,12 +42,19 @@ export function formatDateTime(date: Date | string) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: LIMA_TIMEZONE,
+    ...opts,
   }).format(d);
 }
 
-export function formatTime(date: Date | string) {
+export function formatTime(date: Date | string, opts?: Intl.DateTimeFormatOptions) {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: LIMA_TIMEZONE,
+    ...opts,
+  }).format(d);
 }
 
 export function relativeTime(date: Date | string): string {

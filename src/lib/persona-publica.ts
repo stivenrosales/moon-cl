@@ -40,6 +40,19 @@ export interface PersonaPublica {
   /** Iniciales del avatar, ya resueltas: el cliente no puede calcularlas sin el correo. */
   iniciales: string;
   image: string | null;
+  /**
+   * Prohibición explícita, no un campo. Construir la persona campo por campo
+   * no alcanza: `{ ...u, ...aPersonaPublica(u) }` vuelve a colar el correo y
+   * TypeScript lo deja pasar, porque a las propiedades que vienen de un
+   * spread no les aplica el chequeo de propiedades de más. Se comprobó: con
+   * ese spread, `tsc` y el test de frontera daban los dos en verde mientras
+   * /club publicaba el directorio de correos del club.
+   *
+   * Declarándolo `never`, un objeto que traiga `email: string | null` deja de
+   * ser asignable y el error salta en el gate de tipos, que es donde tiene
+   * que saltar.
+   */
+  email?: never;
 }
 
 /**

@@ -8,14 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getReportThread, resolveReport } from "@/server/actions/moderation";
 import { REPORT_CATEGORY_LABELS, type ReportCategory } from "@/lib/report-categories";
-import { cn, formatDateTime, getInitials } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
+import { cn, formatDateTime } from "@/lib/utils";
 
-interface ReportUser {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-}
+/**
+ * Solo lo público, aunque el panel sea de moderación: este componente es
+ * cliente, así que el correo de reportante y reportada quedaba embebido en
+ * el HTML de /admin. Que la pantalla sea solo-admin baja la severidad, no
+ * cambia el criterio — el correo no tiene por qué salir del servidor para
+ * pintar un nombre y unas iniciales.
+ */
+type ReportUser = PersonaPublica;
 
 export interface ReportRow {
   id: string;
@@ -117,13 +120,13 @@ export function ReportsPanel({ reports }: { reports: ReportRow[] }) {
               <span>
                 Reportante:{" "}
                 <strong className="font-medium text-foreground">
-                  {report.reporter.name ?? report.reporter.email}
+                  {report.reporter.nombre ?? "Sin nombre"}
                 </strong>
               </span>
               <span>
                 Reportado/a:{" "}
                 <strong className="font-medium text-foreground">
-                  {report.reportedUser.name ?? report.reportedUser.email}
+                  {report.reportedUser.nombre ?? "Sin nombre"}
                 </strong>
               </span>
             </div>
@@ -148,12 +151,12 @@ export function ReportsPanel({ reports }: { reports: ReportRow[] }) {
                           <Avatar className="h-6 w-6 shrink-0">
                             {author.image ? <AvatarImage src={author.image} alt="" /> : null}
                             <AvatarFallback className="text-[9px]">
-                              {getInitials(author.name, author.email)}
+                              {author.iniciales}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <p className="text-[11px] text-muted-foreground">
-                              {author.name ?? author.email}{" "}
+                              {author.nombre ?? "Sin nombre"}{" "}
                               <span className="tabular-nums">· {formatDateTime(m.createdAt)}</span>
                             </p>
                             <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>

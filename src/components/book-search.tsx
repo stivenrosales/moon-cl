@@ -11,21 +11,12 @@ import { BookCover } from "@/components/book-cover";
 import { searchBooksAction } from "@/server/actions/books";
 import { suggestBook } from "@/server/actions/suggestions";
 import type { BookCandidate } from "@/lib/google-books";
+import { ejecutarBusqueda, type EstadoBusqueda } from "@/lib/book-search-state";
 
 interface BookSearchProps {
   roundId: string;
   onSuggested?: () => void;
 }
-
-// "Sin resultados" y "la búsqueda falló" son estados distintos (ver
-// BookSearchResult en @/lib/google-books): antes un 429 de Google Books se
-// mostraba igual que "ese libro no existe". Un solo discriminated union en
-// vez de results/searching/error sueltos evita que se puedan pisar entre sí.
-type EstadoBusqueda =
-  | { tipo: "vacio" }
-  | { tipo: "buscando" }
-  | { tipo: "ok"; books: BookCandidate[] }
-  | { tipo: "error" };
 
 export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
   const [query, setQuery] = React.useState("");
@@ -36,19 +27,7 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
 
   const buscar = React.useCallback(async (q: string) => {
     setEstado({ tipo: "buscando" });
-    try {
-      const resultado = await searchBooksAction(q);
-      setEstado(
-        resultado.status === "error"
-          ? { tipo: "error" }
-          : { tipo: "ok", books: resultado.books },
-      );
-    } catch (err) {
-      // La action en sí no debería rechazar (searchBooks nunca lanza), pero
-      // si falla la llamada RPC (sin red, por ejemplo) es el mismo caso:
-      // la búsqueda falló, no que no haya resultados.
-      setEstado({ tipo: "error" });
-    }
+    setEstado(await ejecutarBusqueda(q, searchBooksAction));
   }, []);
 
   React.useEffect(() => {
@@ -158,27 +137,41 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
         ) : null}
       </div>
 
-      {estado.tipo === "ok" && estado.books.length > 0 ? (
-        <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-2 -mr-2">
-          {estado.books.map((book) => (
-            <li key={book.googleBooksId}>
+      {estado.tipo === "resultados" ? (
+        <>
+          {estado.degradado ? (
+            <p className="text-[11px] text-muted-foreground">
+              Resultados incompletos — una fuente no respondió.{" "}
               <button
                 type="button"
-                onClick={() => setSelected(book)}
-                className="group flex w-full gap-3 rounded-xl border border-transparent bg-muted/30 p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+                onClick={() => buscar(query)}
+                className="underline underline-offset-2 hover:text-foreground"
               >
-                <BookCover src={book.coverUrl} title={book.title} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium leading-snug line-clamp-2">{book.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
-                    {book.authors.join(", ") || "Autor desconocido"}
-                    {book.publishedYear ? ` · ${book.publishedYear}` : ""}
-                  </p>
-                </div>
+                Reintentar
               </button>
-            </li>
-          ))}
-        </ul>
+            </p>
+          ) : null}
+          <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-2 -mr-2">
+            {estado.books.map((book) => (
+              <li key={book.googleBooksId}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(book)}
+                  className="group flex w-full gap-3 rounded-xl border border-transparent bg-muted/30 p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+                >
+                  <BookCover src={book.coverUrl} title={book.title} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium leading-snug line-clamp-2">{book.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                      {book.authors.join(", ") || "Autor desconocido"}
+                      {book.publishedYear ? ` · ${book.publishedYear}` : ""}
+                    </p>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : estado.tipo === "error" ? (
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <p className="text-sm text-muted-foreground">
@@ -189,10 +182,23 @@ export function BookSearch({ roundId, onSuggested }: BookSearchProps) {
             Reintentar
           </Button>
         </div>
-      ) : estado.tipo === "ok" ? (
-        <p className="text-center text-sm text-muted-foreground py-8">
-          Sin resultados. Prueba otro título.
-        </p>
+      ) : estado.tipo === "sin-resultados" ? (
+        <div className="space-y-2 py-8 text-center">
+          <p className="text-sm text-muted-foreground">Sin resultados. Prueba otro título.</p>
+          {estado.degradado ? (
+            <p className="text-[11px] text-muted-foreground">
+              Resultados incompletos — una fuente no respondió. Puede que el libro exista y no
+              lo hayamos encontrado.{" "}
+              <button
+                type="button"
+                onClick={() => buscar(query)}
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Reintentar
+              </button>
+            </p>
+          ) : null}
+        </div>
       ) : estado.tipo === "vacio" ? (
         <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground py-6">
           ✦ Empieza a escribir el título o autor ✦

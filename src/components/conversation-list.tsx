@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { routes } from "@/lib/routes";
 import { cn, formatTime, getInitials } from "@/lib/utils";
+import { LIMA_TIMEZONE, limaYear } from "@/lib/lima-date";
 
 export interface ConversationRow {
   otherUserId: string;
@@ -116,14 +117,31 @@ export function ConversationList({ rows, viewerId }: ConversationListProps) {
   );
 }
 
+// Todo el cálculo va anclado a America/Lima, no al huso de quien mira. Este
+// componente es cliente, pero Next lo renderiza primero en el servidor, y el
+// contenedor corre en UTC: sin fijar la zona, el HTML servido mostraba "13
+// jul" para un mensaje de las 21:00 hora Lima del 12, y recién se corregía al
+// hidratar. Es el mismo bug que formatTime ya tenía, dos líneas más abajo.
 function conversationTimeLabel(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
+  const isToday = diaLima(date) === diaLima(now);
   if (isToday) return formatTime(date);
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat(
-    "es-ES",
-    sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" },
-  ).format(date);
+  const sameYear = limaYear(date) === limaYear(now);
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: LIMA_TIMEZONE,
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+/** Día calendario en Lima como "2026-08-14", para comparar dos instantes. */
+function diaLima(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: LIMA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }

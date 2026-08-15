@@ -5,31 +5,35 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { getInitials } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
 import { updateKahootScore } from "@/server/actions/kahoot";
 
-export interface KahootMemberOption {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-}
+/**
+ * Una fila del formulario es una PersonaPublica: nombre visible e iniciales
+ * ya resueltos en el servidor. Esto es cliente, así que antes el correo de
+ * TODO el club viajaba embebido en el HTML de /admin solo para pintar unas
+ * iniciales. Ser pantalla de admin baja la severidad, no cambia el criterio.
+ */
+export type KahootMemberOption = PersonaPublica;
 
 export type KahootScoreValues = Record<
   string,
   { points: string; correctAnswers: string }
 >;
 
+/** Texto de reemplazo de esta pantalla para quien no tiene nombre ni correo. */
+function etiqueta(member: KahootMemberOption): string {
+  return member.nombre ?? "Sin nombre";
+}
+
 function MemberIdentity({ member }: { member: KahootMemberOption }) {
   return (
     <div className="flex items-center gap-2.5 min-w-0 flex-1">
       <Avatar className="h-7 w-7 shrink-0">
         {member.image ? <AvatarImage src={member.image} alt="" /> : null}
-        <AvatarFallback className="text-[10px]">
-          {getInitials(member.name, member.email)}
-        </AvatarFallback>
+        <AvatarFallback className="text-[10px]">{member.iniciales}</AvatarFallback>
       </Avatar>
-      <span className="text-sm truncate">{member.name ?? member.email}</span>
+      <span className="text-sm truncate">{etiqueta(member)}</span>
     </div>
   );
 }
@@ -68,7 +72,7 @@ export function KahootScoresForm({
             inputMode="numeric"
             min={0}
             placeholder="Puntos"
-            aria-label={`Puntos de ${m.name ?? m.email}`}
+            aria-label={`Puntos de ${etiqueta(m)}`}
             className="h-8 w-20 shrink-0 text-right tabular-nums"
             value={values[m.id]?.points ?? ""}
             onChange={(e) => onChange(m.id, "points", e.target.value)}
@@ -146,7 +150,7 @@ function KahootScoreRow({
         points: parsed,
         correctAnswers: initial?.correctAnswers ?? null,
       });
-      toast.success(`Puntaje de ${member.name ?? member.email} actualizado`);
+      toast.success(`Puntaje de ${etiqueta(member)} actualizado`);
     } catch (err) {
       setPoints(initial ? String(initial.points) : "");
       toast.error(err instanceof Error ? err.message : "Error");
@@ -164,7 +168,7 @@ function KahootScoreRow({
         inputMode="numeric"
         min={0}
         placeholder="Puntos"
-        aria-label={`Puntos de ${member.name ?? member.email}`}
+        aria-label={`Puntos de ${etiqueta(member)}`}
         className="h-8 w-20 shrink-0 text-right tabular-nums"
         value={points}
         disabled={pending}

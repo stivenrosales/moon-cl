@@ -22,7 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { postComment, deleteComment, moderateComment, revealComment } from "@/server/actions/comments";
 import { useGoToBookTab } from "@/components/book-tabs-provider";
-import { cn, getInitials, relativeTime } from "@/lib/utils";
+import { cn, relativeTime } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
 import type { GateReason } from "@/server/services/comment-gating";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -31,14 +32,14 @@ import type { GateReason } from "@/server/services/comment-gating";
 // comentario abierto trae `content`, uno bloqueado trae `reason` en su
 // lugar y jamás el texto real hasta que se pide explícitamente con
 // revealComment (id).
+//
+// La autora es PersonaPublica por la misma doctrina: el contenido de un
+// comentario bloqueado no salía del servidor, pero el correo de TODA
+// comentarista sí, embebido en el payload RSC del mismo componente. Se
+// tapaba una filtración y se dejaba la otra abierta al lado.
 // ─────────────────────────────────────────────────────────────────────────
 
-interface CommentAuthor {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-}
+type CommentAuthor = PersonaPublica;
 
 interface CommentNodeBase {
   id: string;
@@ -562,13 +563,13 @@ function CommentItem({
         <Avatar className={cn("shrink-0", isReply ? "h-6 w-6" : "h-7 w-7")}>
           {comment.user.image ? <AvatarImage src={comment.user.image} alt="" /> : null}
           <AvatarFallback className={isReply ? "text-[9px]" : "text-[10px]"}>
-            {getInitials(comment.user.name, comment.user.email)}
+            {comment.user.iniciales}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-sm font-medium leading-snug">
-              {comment.user.name ?? comment.user.email?.split("@")[0]}
+              {comment.user.nombre ?? "Alguien del club"}
             </span>
             <span className="text-[11px] text-muted-foreground/70">
               {relativeTime(comment.createdAt)}

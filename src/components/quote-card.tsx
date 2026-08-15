@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BookCover } from "@/components/book-cover";
 import { toggleQuoteLike, deleteQuote } from "@/server/actions/quotes";
 import { routes } from "@/lib/routes";
-import { cn, getInitials, relativeTime } from "@/lib/utils";
+import type { PersonaPublica } from "@/lib/persona-publica";
+import { cn, relativeTime } from "@/lib/utils";
 
 export interface QuoteCardData {
   id: string;
@@ -19,7 +20,14 @@ export interface QuoteCardData {
   likeCount: number;
   likedByViewer: boolean;
   book: { id: string; title: string; coverUrl: string | null };
-  user: { id: string; name: string | null; email: string | null; image: string | null };
+  /**
+   * PersonaPublica y no la fila de Prisma: esta card es cliente, así que la
+   * autora de cada frase viajaba con su correo dentro del payload RSC de
+   * /club?vista=frases y de /hoy — el directorio de correos del club servido
+   * en el HTML. Nombre visible e iniciales llegan ya resueltos del servidor
+   * (ver aPersonaPublica en @/lib/persona-publica).
+   */
+  user: PersonaPublica;
 }
 
 interface QuoteCardProps {
@@ -100,12 +108,10 @@ export function QuoteCard({ quote, currentUserId, isModerator }: QuoteCardProps)
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="h-5 w-5">
             {quote.user.image ? <AvatarImage src={quote.user.image} alt="" /> : null}
-            <AvatarFallback className="text-[8px]">
-              {getInitials(quote.user.name, quote.user.email)}
-            </AvatarFallback>
+            <AvatarFallback className="text-[8px]">{quote.user.iniciales}</AvatarFallback>
           </Avatar>
           <span className="text-xs text-muted-foreground truncate">
-            {quote.user.name ?? quote.user.email?.split("@")[0]} · {relativeTime(quote.createdAt)}
+            {quote.user.nombre ?? "Alguien del club"} · {relativeTime(quote.createdAt)}
           </span>
         </div>
 

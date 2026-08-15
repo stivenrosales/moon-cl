@@ -17,7 +17,10 @@ import { BookStateButtons } from "@/components/admin/book-state-buttons";
 import { AddBookDialog } from "@/components/admin/add-book-dialog";
 import { NewKahootActivityForm } from "@/components/admin/kahoot-activity-form";
 import { KahootActivityActions } from "@/components/admin/kahoot-activity-actions";
-import { ReportsPanel } from "@/components/admin/reports-panel";
+import { ReportsPanel, type ReportRow } from "@/components/admin/reports-panel";
+import { aPersonaPublica } from "@/lib/persona-publica";
+// getInitials sigue acá para la lista de "Miembros" de más abajo, que se
+// pinta dentro de este Server Component: ahí el correo se usa y se queda.
 import { formatDate, getInitials } from "@/lib/utils";
 import { isModeratorOrAbove } from "@/lib/permissions";
 import { routes } from "@/lib/routes";
@@ -76,11 +79,20 @@ export default async function AdminPage() {
   const ahora = new Date();
   const hayRondaAbierta = rounds.some((r) => r.status === "OPEN" && r.endsAt > ahora);
   const meetingOptions = meetings.map((m) => ({ id: m.id, title: m.title }));
-  const memberOptions = users.map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    image: u.image,
+  // Los formularios de Kahoot son Client Components: mandarles la fila
+  // entera dejaba el correo de todo el club embebido en el HTML de /admin.
+  const memberOptions = users.map((u) => aPersonaPublica(u));
+  // Campo por campo y no `...r`: con el spread viajaba la fila cruda de
+  // Prisma a ReportsPanel (cliente), correos incluidos. Es el mismo motivo
+  // por el que aPersonaPublica se construye a mano.
+  const reportRows: ReportRow[] = reports.map((r) => ({
+    id: r.id,
+    category: r.category,
+    subReason: r.subReason,
+    details: r.details,
+    createdAt: r.createdAt,
+    reporter: aPersonaPublica(r.reporter),
+    reportedUser: aPersonaPublica(r.reportedUser),
   }));
 
   return (
@@ -91,7 +103,7 @@ export default async function AdminPage() {
       <section id="reportes" className="space-y-4">
         <h2 className="display text-2xl">Reportes</h2>
         <Card className="p-6">
-          <ReportsPanel reports={reports} />
+          <ReportsPanel reports={reportRows} />
         </Card>
       </section>
 

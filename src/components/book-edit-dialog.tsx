@@ -20,6 +20,7 @@ import { BookCover } from "@/components/book-cover";
 import { optimizarPortada } from "@/lib/image-optimizer";
 import { searchBooksAction, updateBookAction } from "@/server/actions/books";
 import type { BookCandidate } from "@/lib/google-books";
+import { ejecutarBusqueda, type EstadoBusqueda } from "@/lib/book-search-state";
 
 interface BookEditDialogProps {
   book: {
@@ -77,17 +78,6 @@ export function BookEditDialog({ book }: BookEditDialogProps) {
 // fuentes posibles es la que gana.
 type FuentePortada = "actual" | "busqueda" | "archivo";
 
-// "Sin resultados" y "la búsqueda falló" son estados distintos (ver
-// BookSearchResult en @/lib/google-books): antes un 429 de Google Books se
-// mostraba igual que "no hay portadas para ese título". Un solo
-// discriminated union en vez de resultados/buscando/error sueltos evita
-// que se puedan pisar entre sí.
-type EstadoBusquedaPortadas =
-  | { tipo: "vacio" }
-  | { tipo: "buscando" }
-  | { tipo: "ok"; books: BookCandidate[] }
-  | { tipo: "error" };
-
 function BookEditForm({
   book,
   onClose,
@@ -122,25 +112,29 @@ function BookEditForm({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [coverQuery, setCoverQuery] = React.useState("");
-  const [estadoPortadas, setEstadoPortadas] = React.useState<EstadoBusquedaPortadas>({
+  const [estadoPortadas, setEstadoPortadas] = React.useState<EstadoBusqueda>({
     tipo: "vacio",
   });
   const [coverPickerOpen, setCoverPickerOpen] = React.useState(false);
 
   const buscarPortadas = React.useCallback(async (q: string) => {
     setEstadoPortadas({ tipo: "buscando" });
-    try {
-      const resultado = await searchBooksAction(q);
+    const estado = await ejecutarBusqueda(q, searchBooksAction);
+    // Acá el filtro extra es propio de este picker: solo interesan
+    // candidatos que traigan portada, a diferencia de book-search.tsx /
+    // add-to-shelf-dialog.tsx / add-book-dialog.tsx donde cualquier libro
+    // sirve. Si tras filtrar no queda ninguno, cae a "sin-resultados"
+    // preservando `degradado` — si no, se reintroduciría acá el mismo bug
+    // que este cambio arregla en los otros tres componentes.
+    if (estado.tipo === "resultados") {
+      const conPortada = estado.books.filter((b) => !!b.coverUrl);
       setEstadoPortadas(
-        resultado.status === "error"
-          ? { tipo: "error" }
-          : { tipo: "ok", books: resultado.books.filter((b) => !!b.coverUrl) },
+        conPortada.length > 0
+          ? { tipo: "resultados", books: conPortada, degradado: estado.degradado }
+          : { tipo: "sin-resultados", degradado: estado.degradado },
       );
-    } catch {
-      // La action en sí no debería rechazar (searchBooks nunca lanza), pero
-      // si falla la llamada RPC es el mismo caso: la búsqueda falló, no que
-      // no haya portadas para ese título.
-      setEstadoPortadas({ tipo: "error" });
+    } else {
+      setEstadoPortadas(estado);
     }
   }, []);
 
@@ -342,27 +336,54 @@ function BookEditForm({
                   Reintentar
                 </Button>
               </div>
-            ) : estadoPortadas.tipo === "ok" && estadoPortadas.books.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto">
-                {estadoPortadas.books.map((b) => (
-                  <button
-                    key={b.googleBooksId}
-                    type="button"
-                    onClick={() => elegirPortadaDeBusqueda(b)}
-                    className="group flex flex-col items-center gap-1 rounded-lg border border-transparent p-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                    title={b.title}
-                  >
-                    <BookCover src={b.coverUrl} title={b.title} size="sm" />
-                    <span className="text-[10px] text-muted-foreground line-clamp-2 text-center">
-                      {b.title}
-                    </span>
-                  </button>
-                ))}
+            ) : estadoPortadas.tipo === "resultados" ? (
+              <>
+                {estadoPortadas.degradado ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Resultados incompletos — una fuente no respondió.{" "}
+                    <button
+                      type="button"
+                      onClick={() => buscarPortadas(coverQuery.trim())}
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
+                      Reintentar
+                    </button>
+                  </p>
+                ) : null}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto">
+                  {estadoPortadas.books.map((b) => (
+                    <button
+                      key={b.googleBooksId}
+                      type="button"
+                      onClick={() => elegirPortadaDeBusqueda(b)}
+                      className="group flex flex-col items-center gap-1 rounded-lg border border-transparent p-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                      title={b.title}
+                    >
+                      <BookCover src={b.coverUrl} title={b.title} size="sm" />
+                      <span className="text-[10px] text-muted-foreground line-clamp-2 text-center">
+                        {b.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : estadoPortadas.tipo === "sin-resultados" ? (
+              <div className="space-y-2 py-4 text-center">
+                <p className="text-sm text-muted-foreground">Sin resultados con portada.</p>
+                {estadoPortadas.degradado ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Resultados incompletos — una fuente no respondió. Puede que el libro exista y
+                    no lo hayamos encontrado.{" "}
+                    <button
+                      type="button"
+                      onClick={() => buscarPortadas(coverQuery.trim())}
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
+                      Reintentar
+                    </button>
+                  </p>
+                ) : null}
               </div>
-            ) : estadoPortadas.tipo === "ok" ? (
-              <p className="text-center text-sm text-muted-foreground py-4">
-                Sin resultados con portada.
-              </p>
             ) : (
               <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground py-2">
                 Escribe al menos 2 caracteres

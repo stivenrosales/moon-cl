@@ -78,6 +78,16 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # next.config.ts arma images.remotePatterns leyendo STORAGE_PUBLIC_URL,
+          # y eso se evalúa en BUILD time, no en runtime. Sin esta línea el
+          # patrón queda vacío acá (la env solo existe en el contenedor) y
+          # <Image> bloquea en producción toda portada y todo avatar servidos
+          # desde R2: el archivo está subido y accesible, pero Next se niega a
+          # renderizarlo. Va como `vars` y no como `secrets` a propósito: el
+          # host público del bucket viaja en el HTML de cualquier portada, no
+          # es un secreto y no gana nada con estar oculto.
+          build-args: |
+            STORAGE_PUBLIC_URL=${{ vars.STORAGE_PUBLIC_URL }}
           # Cache de capas en GitHub Actions: builds siguientes no repiten
           # `npm ci` ni `next build` desde cero si nada relevante cambió.
           cache-from: type=gha

@@ -58,6 +58,15 @@ COPY . .
 # No mandamos telemetría de Next durante el build de CI.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# El host público del storage tiene que estar disponible DURANTE el build:
+# next.config.ts arma images.remotePatterns a partir de él, y esa lista queda
+# horneada en la imagen. Si falta, el patrón se arma vacío y <Image> bloquea
+# en producción todas las portadas y avatares que vienen de R2 — el archivo
+# existe y responde 200, pero Next se niega a servirlo. No es un secreto: la
+# URL viaja en el HTML de cualquier portada.
+ARG STORAGE_PUBLIC_URL
+ENV STORAGE_PUBLIC_URL=$STORAGE_PUBLIC_URL
+
 # El repo no tiene carpeta public/ (no la necesita hoy). El Dockerfile no
 # debe asumir que siga así: si el stage final intenta copiar /app/public y
 # no existe, el build entero revienta. Crearla vacía acá la vuelve a prueba

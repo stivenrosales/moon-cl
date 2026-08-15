@@ -238,7 +238,16 @@ async function PersonasView() {
     db.user.findMany({
       where: { id: { not: userId } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, image: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        createdAt: true,
+        countryCode: true,
+        city: true,
+        citySlug: true,
+      },
     }),
   ]);
   const clubPersonasNudge = nudge && nudge.screen === "club-personas" ? nudge : null;
@@ -289,6 +298,10 @@ async function PersonasView() {
       // Client Component, así que mandarlo era publicar el directorio de
       // correos del club en el HTML de /club?vista=personas.
       ...aPersonaPublica(u),
+      // citySlug aparte de aPersonaPublica: es un dato interno para el
+      // filtro del directorio (member-list-filter.ts), no algo que se
+      // muestra — PersonaPublica solo expone la ciudad ya formateada.
+      citySlug: u.citySlug,
       isFollowing: followingSet.has(u.id),
       booksInCommon:
         viewerAffinityData && memberAffinityData

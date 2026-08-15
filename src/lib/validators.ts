@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GENEROS } from "@/lib/genres";
+import { CODIGOS_PAIS } from "@/lib/paises";
 
 export const emailSchema = z.object({
   email: z.string().email("Ingresa un correo válido"),
@@ -104,11 +105,22 @@ export const rsvpSchema = z.object({
 // Onboarding 18+ y perfil (Paquete C)
 // ─────────────────────────────────────────────────────────────────────────
 
+// El enum sobre CODIGOS_PAIS es el precedente exacto de favoriteGenres con
+// GENEROS: un país inventado se rechaza acá, en el borde, en vez de colarse
+// a la base. Ver docs/superpowers/specs/2026-08-14-ciudad-pais-usuaria-design.md.
+export const ubicacionSchema = z.object({
+  countryCode: z.enum(CODIGOS_PAIS, { message: "Elige tu país" }),
+  city: z.string().trim().min(2, "Escribe tu ciudad").max(80),
+});
+
 export const onboardingSchema = z.object({
   ageConfirmed: z.literal(true, {
     message: "Debes confirmar que tienes 18 años o más",
   }),
   favoriteGenres: z.array(z.enum(GENEROS)).max(10).optional().default([]),
+  // Obligatoria: el paso 3 del onboarding no deja terminar sin ella (a
+  // diferencia de los géneros, que sí se pueden saltar).
+  ubicacion: ubicacionSchema,
 });
 
 export const profileUpdateSchema = z.object({
@@ -116,6 +128,9 @@ export const profileUpdateSchema = z.object({
   bio: z.string().max(280).optional().nullable(),
   birthday: z.coerce.date().optional().nullable(),
   favoriteGenres: z.array(z.enum(GENEROS)).max(10).optional().default([]),
+  // Opcional y nullable, igual que bio y birthday: desde el perfil se puede
+  // borrar la ubicación mandando null.
+  ubicacion: ubicacionSchema.optional().nullable(),
 });
 
 // Body de POST /api/avatar. Solo valida FORMA (tipos, presencia): sin esto,

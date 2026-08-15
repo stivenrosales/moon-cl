@@ -13,6 +13,7 @@ import { FollowButton } from "@/components/follow-button";
 import { ProfileStat } from "@/components/profile-stat";
 import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
+import { nombrePais } from "@/lib/paises";
 import { routes } from "@/lib/routes";
 import { inicioDeAnioLima } from "@/lib/lima-date";
 import type { Role } from "@prisma/client";
@@ -22,6 +23,18 @@ const roleLabel: Record<Role, string> = {
   MODERATOR: "Moderadora",
   MEMBER: "Miembro",
 };
+
+/**
+ * "Lima, Perú" si hay ciudad, o solo "Perú" si únicamente se declaró país.
+ * null si no hay countryCode o si el código no traduce (no debería pasar:
+ * el enum de Zod lo valida al guardar, pero nombrePais nunca lanza).
+ */
+function textoUbicacion(countryCode: string | null, city: string | null): string | null {
+  if (!countryCode) return null;
+  const pais = nombrePais(countryCode);
+  if (!pais) return null;
+  return city ? `${city}, ${pais}` : pais;
+}
 
 export default async function PerfilPublicoPage({
   params,
@@ -38,7 +51,25 @@ export default async function PerfilPublicoPage({
 
   const [user, isFollowing, followCounts, readThisYear, readingNow, clubBook, lastReview] =
     await Promise.all([
-      db.user.findUnique({ where: { id } }),
+      // select explícito: sin él, findUnique traía la fila entera (correo
+      // incluido). Hoy no había leak porque este Server Component arma el
+      // JSX a mano, pero es la doctrina de aPersonaPublica() aplicada donde
+      // todavía no había llegado — acotar a lo que realmente se pinta.
+      db.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          role: true,
+          createdAt: true,
+          bio: true,
+          favoriteGenres: true,
+          countryCode: true,
+          city: true,
+        },
+      }),
       db.follow.findUnique({
         where: { followerId_followingId: { followerId: myId, followingId: id } },
       }),
@@ -77,6 +108,8 @@ export default async function PerfilPublicoPage({
   const chapterComparison = readingClubBook
     ? await getChapterComparison(myId, id, clubBook!.id)
     : null;
+
+  const ubicacionVisible = textoUbicacion(user.countryCode, user.city);
 
   return (
     <div className="space-y-7">
@@ -168,10 +201,13 @@ export default async function PerfilPublicoPage({
         </section>
       ) : null}
 
-      {/* Bio */}
-      {user.bio ? (
+      {/* Bio y ubicación */}
+      {user.bio || ubicacionVisible ? (
         <section className="space-y-2">
-          <p className="text-sm text-foreground/90 leading-relaxed">{user.bio}</p>
+          {user.bio ? <p className="text-sm text-foreground/90 leading-relaxed">{user.bio}</p> : null}
+          {ubicacionVisible ? (
+            <p className="text-xs text-muted-foreground">📍 {ubicacionVisible}</p>
+          ) : null}
         </section>
       ) : null}
 

@@ -23,6 +23,7 @@ import { db } from "@/lib/db";
 export const NUDGE_EPOCH = new Date("2026-07-16T00:00:00.000Z");
 
 export const NUDGE_KEYS = [
+  "ubicacion",
   "bienvenida",
   "primer-progreso",
   "primer-rating",
@@ -38,6 +39,7 @@ export type NudgeKey = (typeof NUDGE_KEYS)[number];
 export type NudgeScreen = "hoy" | "leer-mios" | "club-actividad" | "club-personas";
 
 export const NUDGE_SCREENS: Record<NudgeKey, NudgeScreen> = {
+  ubicacion: "hoy",
   bienvenida: "hoy",
   "primer-progreso": "leer-mios",
   "primer-rating": "leer-mios",
@@ -71,6 +73,8 @@ export interface NudgeQueueInput {
 
   onboardedAt: Date | null;
   accountCreatedAt: Date;
+  /** null = nunca completó la ubicación (ni onboarding ni perfil). Dispara "ubicacion". */
+  countryCode: string | null;
 
   userBookCount: number;
   readingProgressCount: number;
@@ -95,6 +99,39 @@ export interface NudgeQueueInput {
 
 function afterEpoch(date: Date | null): boolean {
   return date != null && date.getTime() > NUDGE_EPOCH.getTime();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ubicacion es la ÚNICA excepción a la doctrina de afterEpoch de este
+// archivo, y es a propósito — no la "arregles" agregando el epoch de vuelta.
+//
+// Todos los demás disparadores son ESTADOS ACUMULADOS ("3 calificaciones",
+// "2 seguidos"): una veterana los cumple desde hace meses, y por eso se
+// anclan a la fecha real en que se volvieron ciertos y exigen que sea
+// posterior a NUDGE_EPOCH — si no, le explotarían todos en la cara el día
+// del deploy.
+//
+// Acá es al revés. El único ancla disponible sería onboardedAt, pero
+// afterEpoch(onboardedAt) da FALSE para toda veterana — que es exactamente
+// a quien queremos invitar. Ancladar este nudge a onboardedAt lo apagaría
+// para siempre y el directorio se quedaría medio vacío. La razón de fondo:
+// este disparador no es un logro que la usuaria alcanzó en el pasado, es un
+// dato que ACABAMOS DE INVENTAR — su fecha de "se volvió cierto" es la del
+// deploy, igual para todas. No hay nadie injustamente molestada, porque no
+// hay nada que la usuaria haya hecho antes: le falta un campo que hasta
+// ayer no existía.
+//
+// Es seguro sin el epoch porque: UserNudge es único por [userId, key] y
+// dismissNudge escribe dismissedAt (se muestra UNA vez y nunca vuelve);
+// nextNudge devuelve UNA sola invitación para toda la app; y se AUTO-APAGA
+// en cuanto la usuaria guarda su país — más sano que primer-rating y
+// primer-mensaje, que según los comentarios de abajo reaparecen porque su
+// disparador no se apaga con la acción. Las socias nuevas nunca lo ven:
+// el onboarding les exige la ubicación en el paso 3, así que countryCode
+// nunca es null para ellas.
+// ─────────────────────────────────────────────────────────────────────────
+function checkUbicacion(input: NudgeQueueInput): boolean {
+  return input.onboardedAt != null && input.countryCode == null;
 }
 
 /**
@@ -156,6 +193,7 @@ function checkSugerir(input: NudgeQueueInput): boolean {
 // contrato: el usuario recién llegado ve primero el nudge de arranque, y
 // solo cuando ya no aplica se evalúa el siguiente peldaño.
 const NUDGE_CHECKS: ReadonlyArray<readonly [NudgeKey, (input: NudgeQueueInput) => boolean]> = [
+  ["ubicacion", checkUbicacion],
   ["bienvenida", checkBienvenida],
   ["primer-progreso", checkPrimerProgreso],
   ["primer-rating", checkPrimerRating],
@@ -226,7 +264,7 @@ export async function nextNudge(
   ] = await Promise.all([
     client.user.findUnique({
       where: { id: userId },
-      select: { onboardedAt: true, createdAt: true, isMatchOptIn: true },
+      select: { onboardedAt: true, createdAt: true, isMatchOptIn: true, countryCode: true },
     }),
     client.userBook.count({ where: { userId } }),
     client.readingProgress.count({ where: { userId } }),
@@ -283,6 +321,7 @@ export async function nextNudge(
     dismissedKeys,
     onboardedAt: user.onboardedAt,
     accountCreatedAt: user.createdAt,
+    countryCode: user.countryCode,
     userBookCount,
     readingProgressCount,
     hasFinishedFirstBook: !!firstFinished?.finishedAt,

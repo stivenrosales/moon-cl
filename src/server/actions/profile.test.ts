@@ -35,7 +35,7 @@ vi.mock("@/lib/storage/s3-adapter", () => ({
   },
 }));
 
-import { setAvatar } from "@/server/actions/profile";
+import { completeOnboarding, setAvatar, updateProfile } from "@/server/actions/profile";
 
 const ME = { id: "cme111111111111111111111", role: "MEMBER" };
 const OTRA_PERSONA = "cme999999999999999999999";
@@ -155,5 +155,123 @@ describe("setAvatar", () => {
       URL_NUEVA,
     );
     expect(storageBorrarMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("completeOnboarding", () => {
+  // countryCode, city y citySlug se escriben JUNTOS vía camposUbicacion():
+  // la invariante es que nadie los arma a mano (misma doctrina que
+  // ReadingProgress + UserBook en updateProgress).
+  it("escribe countryCode, city y citySlug juntos usando camposUbicacion", async () => {
+    userUpdateMock.mockResolvedValue({});
+
+    await completeOnboarding({
+      ageConfirmed: true,
+      favoriteGenres: [],
+      ubicacion: { countryCode: "PE", city: "Lima" },
+    });
+
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: ME.id },
+      data: expect.objectContaining({
+        countryCode: "PE",
+        city: "Lima",
+        citySlug: "lima",
+      }),
+    });
+  });
+
+  it("rechaza un countryCode inventado y no escribe nada", async () => {
+    await expect(
+      completeOnboarding({
+        ageConfirmed: true,
+        favoriteGenres: [],
+        ubicacion: { countryCode: "XX", city: "Lima" },
+      }),
+    ).rejects.toThrow();
+
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+
+  // La ubicación es obligatoria en el onboarding (ver ubicacionSchema en
+  // validators.ts): sin ella el schema rechaza antes de tocar la base.
+  it("rechaza cuando falta la ubicación", async () => {
+    await expect(
+      completeOnboarding({ ageConfirmed: true, favoriteGenres: [] }),
+    ).rejects.toThrow();
+
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateProfile", () => {
+  it("escribe countryCode, city y citySlug juntos al guardar una ubicación válida", async () => {
+    userUpdateMock.mockResolvedValue({});
+
+    await updateProfile({
+      name: "María Pérez",
+      ubicacion: { countryCode: "PE", city: "Arequipa" },
+    });
+
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: ME.id },
+      data: expect.objectContaining({
+        countryCode: "PE",
+        city: "Arequipa",
+        citySlug: "arequipa",
+      }),
+    });
+  });
+
+  it("borrar la ubicación (ubicacion: null) escribe null en los tres campos", async () => {
+    userUpdateMock.mockResolvedValue({});
+
+    await updateProfile({ name: "María Pérez", ubicacion: null });
+
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: ME.id },
+      data: expect.objectContaining({
+        countryCode: null,
+        city: null,
+        citySlug: null,
+      }),
+    });
+  });
+
+  it("omitir ubicacion también escribe null en los tres campos (no hay estado 'sin tocar' en la escritura)", async () => {
+    userUpdateMock.mockResolvedValue({});
+
+    await updateProfile({ name: "María Pérez" });
+
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: ME.id },
+      data: expect.objectContaining({
+        countryCode: null,
+        city: null,
+        citySlug: null,
+      }),
+    });
+  });
+
+  // El directorio de /club ahora muestra la ciudad, así que updateProfile
+  // tiene que revalidarlo además de /perfil.
+  it("revalida /perfil y /club", async () => {
+    userUpdateMock.mockResolvedValue({});
+
+    await updateProfile({ name: "María Pérez" });
+
+    expect(revalidatePathMock).toHaveBeenCalledWith("/perfil");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/club");
+  });
+
+  it("rechaza un countryCode inventado y no escribe nada", async () => {
+    await expect(
+      updateProfile({
+        name: "María Pérez",
+        ubicacion: { countryCode: "XX", city: "Arequipa" },
+      }),
+    ).rejects.toThrow();
+
+    expect(userUpdateMock).not.toHaveBeenCalled();
   });
 });

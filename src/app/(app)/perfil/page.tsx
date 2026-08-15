@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getFollowCounts } from "@/server/services/social";
 import { formatDate, getInitials } from "@/lib/utils";
+import { nombrePais } from "@/lib/paises";
 import { routes } from "@/lib/routes";
 import { getAccountAccessItems, type AccountAccessKey } from "@/lib/account-access";
 import type { Role } from "@prisma/client";
@@ -24,6 +25,18 @@ const roleLabel: Record<Role, string> = {
 };
 
 export const metadata = { title: "Mi perfil" };
+
+/**
+ * "Lima, Perú" si hay ciudad, o solo "Perú" si únicamente se declaró país.
+ * null si no hay countryCode o si el código no traduce (no debería pasar:
+ * el enum de Zod lo valida al guardar, pero nombrePais nunca lanza).
+ */
+function textoUbicacion(countryCode: string | null, city: string | null): string | null {
+  if (!countryCode) return null;
+  const pais = nombrePais(countryCode);
+  if (!pais) return null;
+  return city ? `${city}, ${pais}` : pais;
+}
 
 export default async function PerfilPage() {
   const session = await getSession();
@@ -44,6 +57,8 @@ export default async function PerfilPage() {
         birthday: true,
         favoriteGenres: true,
         isMatchOptIn: true,
+        countryCode: true,
+        city: true,
       },
     }),
     db.bookSuggestion.findMany({
@@ -63,6 +78,7 @@ export default async function PerfilPage() {
 
   if (!user) return null;
 
+  const ubicacionVisible = textoUbicacion(user.countryCode, user.city);
   const accountAccess = getAccountAccessItems(user.role);
   const isAccountAccessVisible = (key: AccountAccessKey) =>
     accountAccess.find((item) => item.key === key)?.visible ?? false;
@@ -173,10 +189,13 @@ export default async function PerfilPage() {
         </section>
       ) : null}
 
-      {/* Bio y cumpleaños */}
-      {user.bio || user.birthday ? (
+      {/* Bio, ubicación y cumpleaños */}
+      {user.bio || ubicacionVisible || user.birthday ? (
         <section className="space-y-2">
           {user.bio ? <p className="text-sm text-foreground/90 leading-relaxed">{user.bio}</p> : null}
+          {ubicacionVisible ? (
+            <p className="text-xs text-muted-foreground">📍 {ubicacionVisible}</p>
+          ) : null}
           {user.birthday ? (
             <p className="text-xs text-muted-foreground">
               {/* timeZone UTC porque birthday es @db.Date: una fecha de

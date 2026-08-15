@@ -40,6 +40,14 @@ export interface NudgeCopy {
 
 export function resolveNudgeCopy(key: NudgeKey, ctx: NudgeCardContext = {}): NudgeCopy {
   switch (key) {
+    case "ubicacion":
+      return {
+        kicker: "TE FALTA UN DATO",
+        title: "¿De dónde nos lees?",
+        titleScript: false,
+        body: "Con tu ciudad y país, las socias del club te encuentran por cercanía. Son 10 segundos.",
+        cta: "Agregar mi ubicación",
+      };
     case "bienvenida":
       // Bug 1: sin libroId no hay libro sobre el cual crear un UserBook — el
       // club puede estar entre rondas, o el usuario onboardeó antes de la
@@ -118,6 +126,8 @@ export type NudgeAction =
  * comportamiento — igual que routes.ts decide el string, nunca el componente. */
 export function resolveNudgeAction(key: NudgeKey, ctx: NudgeCardContext = {}): NudgeAction {
   switch (key) {
+    case "ubicacion":
+      return { type: "navigate", href: routes.perfil() };
     case "bienvenida":
       // Bug 1: nunca prometer start-reading sin libroId — no hay UserBook
       // que crear. Sin id, el CTA navega al club en su lugar (copy honesto

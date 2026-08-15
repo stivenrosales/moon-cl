@@ -20,6 +20,7 @@ import { Label, Field, FieldDescription } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GENEROS } from "@/lib/genres";
 import { nombresDeMeses } from "@/lib/months";
+import { paisesOrdenados } from "@/lib/paises";
 import { cn, getInitials } from "@/lib/utils";
 import { setAvatar, updateProfile } from "@/server/actions/profile";
 import { toggleMatchOptIn } from "@/server/actions/match";
@@ -30,6 +31,9 @@ const MAX_GENRES = 10;
 // en UTC. Ver src/lib/months.ts: hacerlo en la zona del navegador la corría
 // un lugar y elegir "Marzo" guardaba abril.
 const MONTHS = nombresDeMeses();
+// Perú primero, resto alfabético — ver paisesOrdenados(). Fuera del
+// componente porque la lista no depende de ningún estado.
+const PAISES = paisesOrdenados();
 
 function daysInMonth(monthIndex: number) {
   return new Date(Date.UTC(2000, monthIndex + 1, 0)).getUTCDate();
@@ -43,6 +47,11 @@ interface ProfileEditDialogProps {
     image: string | null;
     bio: string | null;
     birthday: Date | null;
+    // Opcionales en el tipo (no en el schema de escritura): las páginas que
+    // todavía no seleccionan estas columnas siguen compilando, y el
+    // formulario las trata igual que ausentes (?? "").
+    countryCode?: string | null;
+    city?: string | null;
     favoriteGenres: string[];
     isMatchOptIn: boolean;
   };
@@ -100,6 +109,8 @@ function ProfileEditForm({
   const [month, setMonth] = React.useState(
     user.birthday ? String(new Date(user.birthday).getUTCMonth()) : "",
   );
+  const [countryCode, setCountryCode] = React.useState(user.countryCode ?? "");
+  const [city, setCity] = React.useState(user.city ?? "");
   const [genres, setGenres] = React.useState<string[]>(user.favoriteGenres);
   const [matchOptIn, setMatchOptIn] = React.useState(user.isMatchOptIn);
   const [matchToggling, setMatchToggling] = React.useState(false);
@@ -181,10 +192,18 @@ function ProfileEditForm({
         day !== "" && month !== ""
           ? new Date(Date.UTC(2000, Number(month), Number(day)))
           : null;
+      // Combo incompleto (país sin ciudad válida, o viceversa) se manda como
+      // null: profileUpdateSchema exige los dos juntos o ninguno, y esto
+      // borra en vez de reventar el submit con un error críptico de Zod.
+      const ubicacion =
+        countryCode !== "" && city.trim().length >= 2
+          ? { countryCode, city: city.trim() }
+          : null;
       await updateProfile({
         name: name.trim(),
         bio: bio.trim() || null,
         birthday,
+        ubicacion,
         favoriteGenres: genres,
       });
       toast.success("Perfil actualizado");
@@ -260,6 +279,33 @@ function ProfileEditForm({
             maxLength={280}
             placeholder="Cuéntanos un poco de ti…"
           />
+        </Field>
+
+        <Field>
+          <Label optional>Ciudad y país</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              aria-label="País"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+            >
+              <option value="">País</option>
+              {PAISES.map(({ codigo, nombre }) => (
+                <option key={codigo} value={codigo}>
+                  {nombre}
+                </option>
+              ))}
+            </Select>
+            <Input
+              aria-label="Ciudad"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Ciudad"
+              maxLength={80}
+              autoComplete="address-level2"
+            />
+          </div>
+          <FieldDescription>Otras socias del club te encuentran por ciudad.</FieldDescription>
         </Field>
 
         <Field>

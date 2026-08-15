@@ -18,6 +18,7 @@ import {
   roundSchema,
   shelfStatusSchema,
   solicitudSubidaAvatarSchema,
+  ubicacionSchema,
   updateMyBookSchema,
 } from "@/lib/validators";
 
@@ -494,9 +495,61 @@ describe("idSchema", () => {
   });
 });
 
+describe("ubicacionSchema", () => {
+  it("acepta un país y una ciudad válidos", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE", city: "Lima" });
+    expect(result.success).toBe(true);
+  });
+
+  it("recorta espacios de la ciudad (trim)", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE", city: "  Lima  " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.city).toBe("Lima");
+    }
+  });
+
+  it("rechaza una ciudad de un solo carácter", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE", city: "L" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una ciudad vacía tras el trim", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE", city: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una ciudad de más de 80 caracteres", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE", city: "a".repeat(81) });
+    expect(result.success).toBe(false);
+  });
+
+  // El enum sobre CODIGOS_PAIS es el precedente exacto de favoriteGenres con
+  // GENEROS: un país inventado se rechaza en el borde, no se relaja el schema.
+  it("rechaza un código de país que no está en CODIGOS_PAIS", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "XX", city: "Lima" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta el país", () => {
+    const result = ubicacionSchema.safeParse({ city: "Lima" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza cuando falta la ciudad", () => {
+    const result = ubicacionSchema.safeParse({ countryCode: "PE" });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("onboardingSchema", () => {
+  const UBICACION_VALIDA = { countryCode: "PE", city: "Lima" };
+
   it("acepta ageConfirmed=true sin géneros (default [])", () => {
-    const result = onboardingSchema.safeParse({ ageConfirmed: true });
+    const result = onboardingSchema.safeParse({
+      ageConfirmed: true,
+      ubicacion: UBICACION_VALIDA,
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.favoriteGenres).toEqual([]);
@@ -507,17 +560,21 @@ describe("onboardingSchema", () => {
     const result = onboardingSchema.safeParse({
       ageConfirmed: true,
       favoriteGenres: ["Novela", "Terror", "Ciencia ficción"],
+      ubicacion: UBICACION_VALIDA,
     });
     expect(result.success).toBe(true);
   });
 
   it("rechaza ageConfirmed=false", () => {
-    const result = onboardingSchema.safeParse({ ageConfirmed: false });
+    const result = onboardingSchema.safeParse({
+      ageConfirmed: false,
+      ubicacion: UBICACION_VALIDA,
+    });
     expect(result.success).toBe(false);
   });
 
   it("rechaza cuando falta ageConfirmed", () => {
-    const result = onboardingSchema.safeParse({});
+    const result = onboardingSchema.safeParse({ ubicacion: UBICACION_VALIDA });
     expect(result.success).toBe(false);
   });
 
@@ -525,6 +582,7 @@ describe("onboardingSchema", () => {
     const result = onboardingSchema.safeParse({
       ageConfirmed: true,
       favoriteGenres: ["Ciencia ficción", "Manga"],
+      ubicacion: UBICACION_VALIDA,
     });
     expect(result.success).toBe(false);
   });
@@ -545,6 +603,30 @@ describe("onboardingSchema", () => {
         "Policial",
         "Thriller",
       ],
+      ubicacion: UBICACION_VALIDA,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // La ubicación es requisito para completar el onboarding (spec: "Captura
+  // Obligatoria en el onboarding"). Sin ella no hay forma de terminar.
+  it("rechaza cuando falta la ubicación", () => {
+    const result = onboardingSchema.safeParse({ ageConfirmed: true });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza un país inventado dentro de la ubicación", () => {
+    const result = onboardingSchema.safeParse({
+      ageConfirmed: true,
+      ubicacion: { countryCode: "XX", city: "Lima" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una ciudad vacía dentro de la ubicación", () => {
+    const result = onboardingSchema.safeParse({
+      ageConfirmed: true,
+      ubicacion: { countryCode: "PE", city: "" },
     });
     expect(result.success).toBe(false);
   });
@@ -603,6 +685,45 @@ describe("profileUpdateSchema", () => {
     const result = profileUpdateSchema.safeParse({
       name: "María Pérez",
       favoriteGenres: ["Manga"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // A diferencia de onboardingSchema, acá la ubicación es opcional y
+  // nullable, igual que bio y birthday: desde el perfil se puede borrar.
+  it("acepta un perfil sin mencionar la ubicación (queda sin tocar)", () => {
+    const result = profileUpdateSchema.safeParse({ name: "María Pérez" });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta ubicacion como null (borrar la ubicación)", () => {
+    const result = profileUpdateSchema.safeParse({ name: "María Pérez", ubicacion: null });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ubicacion).toBeNull();
+    }
+  });
+
+  it("acepta una ubicación válida", () => {
+    const result = profileUpdateSchema.safeParse({
+      name: "María Pérez",
+      ubicacion: { countryCode: "PE", city: "Arequipa" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza un país inventado dentro de la ubicación, aunque el resto del perfil sea válido", () => {
+    const result = profileUpdateSchema.safeParse({
+      name: "María Pérez",
+      ubicacion: { countryCode: "XX", city: "Arequipa" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza una ubicación con país pero sin ciudad válida", () => {
+    const result = profileUpdateSchema.safeParse({
+      name: "María Pérez",
+      ubicacion: { countryCode: "PE", city: "" },
     });
     expect(result.success).toBe(false);
   });

@@ -1,4 +1,6 @@
 import { getInitials } from "@/lib/utils";
+import { construirUbicacion } from "@/lib/ubicacion";
+import { nombrePais } from "@/lib/paises";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Frontera entre lo que el servidor SABE de una socia y lo que puede viajar
@@ -26,6 +28,13 @@ export interface PersonaConCorreo {
   name: string | null;
   email: string | null;
   image: string | null;
+  /**
+   * Opcionales: no todas las llamadas seleccionan ubicación (p. ej. la
+   * pareja de Book Match o la autora de una frase no la necesitan). Ausentes
+   * equivale a "sin ubicación", el mismo resultado que countryCode: null.
+   */
+  countryCode?: string | null;
+  city?: string | null;
 }
 
 /** Lo único de una socia ajena que puede cruzar hacia el cliente. */
@@ -40,6 +49,10 @@ export interface PersonaPublica {
   /** Iniciales del avatar, ya resueltas: el cliente no puede calcularlas sin el correo. */
   iniciales: string;
   image: string | null;
+  /** Ciudad tal como la escribió ella, con tildes. Nunca el slug (es interno). */
+  ciudad: string | null;
+  /** País ya traducido en el servidor ("Perú"), nunca el código ISO ("PE"). */
+  pais: string | null;
   /**
    * Prohibición explícita, no un campo. Construir la persona campo por campo
    * no alcanza: `{ ...u, ...aPersonaPublica(u) }` vuelve a colar el correo y
@@ -70,12 +83,22 @@ export function nombreVisible(name: string | null, email: string | null): string
 /**
  * Construida campo por campo a propósito: con `...u` el correo se colaba de
  * vuelta sin que nadie lo notara, que es exactamente el bug original.
+ *
+ * ciudad/pais se derivan con construirUbicacion(): reusa la misma invariante
+ * de src/lib/ubicacion.ts (ciudad sin país es imposible de escribir) en vez
+ * de confiar en que u.city y u.countryCode ya lleguen consistentes.
  */
 export function aPersonaPublica(u: PersonaConCorreo): PersonaPublica {
+  const ubicacion = construirUbicacion({ countryCode: u.countryCode, city: u.city });
+  const pais = ubicacion.tipo === "sin-ubicacion" ? null : nombrePais(ubicacion.countryCode);
+  const ciudad = ubicacion.tipo === "completa" ? ubicacion.city : null;
+
   return {
     id: u.id,
     nombre: nombreVisible(u.name, u.email),
     iniciales: getInitials(u.name, u.email),
     image: u.image,
+    ciudad,
+    pais,
   };
 }

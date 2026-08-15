@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { onboardingSchema, profileUpdateSchema } from "@/lib/validators";
+import { camposUbicacion, construirUbicacion } from "@/lib/ubicacion";
 import { routes } from "@/lib/routes";
 import { requireUser } from "@/server/auth-helpers";
 import { extraerKeyDeUrl } from "@/lib/storage/public-url";
@@ -22,12 +23,19 @@ export async function completeOnboarding(input: unknown) {
   const user = await requireUser();
   const data = completeOnboardingInputSchema.parse(input);
 
+  // camposUbicacion() es la ÚNICA forma de producir estos tres campos:
+  // nunca se arman a mano (misma doctrina que ReadingProgress + UserBook
+  // en updateProgress). data.ubicacion es obligatoria acá (onboardingSchema
+  // lo exige), así que siempre llega { countryCode, city }.
+  const ubicacion = camposUbicacion(construirUbicacion(data.ubicacion));
+
   await db.user.update({
     where: { id: user.id },
     data: {
       ageConfirmedAt: new Date(),
       onboardedAt: new Date(),
       favoriteGenres: data.favoriteGenres,
+      ...ubicacion,
       ...(data.name ? { name: data.name } : {}),
     },
   });
@@ -40,6 +48,13 @@ export async function updateProfile(input: unknown) {
   const user = await requireUser();
   const data = profileUpdateSchema.parse(input);
 
+  // A diferencia del onboarding, acá la ubicación es opcional y nullable:
+  // undefined (no se tocó el campo) y null (se borró a propósito) caen los
+  // dos en construirUbicacion({}) -> "sin-ubicacion" -> los tres campos en
+  // null. El formulario de perfil siempre manda el estado completo (no es
+  // una escritura parcial), así que esto es correcto y no un "olvido".
+  const ubicacion = camposUbicacion(construirUbicacion(data.ubicacion ?? {}));
+
   await db.user.update({
     where: { id: user.id },
     data: {
@@ -47,10 +62,13 @@ export async function updateProfile(input: unknown) {
       bio: data.bio ?? null,
       birthday: data.birthday ?? null,
       favoriteGenres: data.favoriteGenres,
+      ...ubicacion,
     },
   });
 
   revalidatePath(routes.perfil());
+  // El directorio de /club ahora muestra la ciudad de cada socia.
+  revalidatePath(routes.club());
 }
 
 export async function setAvatar(url: string) {

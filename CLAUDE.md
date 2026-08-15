@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm run dev            # servidor de desarrollo
-npm test               # vitest run (671 tests / 52 archivos, ~2s)
+npm test               # vitest run (784 tests / 64 archivos, ~2s)
 npm run test:watch     # vitest en watch
 npx tsc --noEmit       # chequeo de tipos — el gate real de este repo
 npm run build          # prisma generate && next build — NO toca la base
@@ -168,8 +168,24 @@ en varias rutas solo porque ahora se puede.
 además manda el email, sin transacción. Dispararlo dos veces el mismo lunes revienta con
 violación de constraint después de haber enviado correos. Ojo al reintentar el cron a mano.
 
+**El SDK de Resend no lanza ante un error de la API: devuelve `{ data, error }`.** Los tres
+jobs que mandan correo ignoraban ese `error`, así que un fallo real —dominio sin verificar,
+rate limit, saldo— se veía igual que un envío exitoso; `sendMeetingReminders` además marcaba
+`remindedAt` pasara lo que pasara, dejando la reunión como recordada sin haberse enviado y sin
+reintento posible. Si agregas un job que manda correo, verifica el `error` y que el resultado
+que devuelves al dispatcher refleje los fallos: eso es lo único que se ve desde afuera.
+
 Las fechas de negocio se calculan en `America/Lima`, no en UTC — rachas, cumpleaños y
-recordatorios se rompen cerca de medianoche si usas UTC.
+recordatorios se rompen cerca de medianoche si usas UTC. Los helpers viven en
+`src/lib/lima-date.ts` (`LIMA_TIMEZONE`, `limaYear`, `inicioDeAnioLima`, `fechaDiscretaLima`)
+y los formateadores de `src/lib/utils.ts` ya usan Lima por defecto.
+
+Esto vale también para el navegador, no solo para los jobs: **el contenedor corre en UTC**, así
+que un `Intl.DateTimeFormat` sin `timeZone` dentro de un Server Component —o de un componente
+cliente, que igual se renderiza primero en el servidor— muestra el día siguiente entre las 19:00
+y las 23:59 hora Lima. Ya pasó en `/hoy`, en el contador anual del perfil público y en la lista
+de conversaciones. Un test de fecha **debe** fijar `process.env.TZ` y dar lo mismo con
+`TZ=America/Lima` y con `TZ=UTC`: el CI corre en UTC y ahí estos bugs son invisibles.
 
 ## Mapa del dominio
 
@@ -182,9 +198,31 @@ solo archivo:
 un campo, no una verdad: una ronda vencida sigue marcada `OPEN` hasta que el cron la cierre,
 así que las reglas comparan contra `endsAt`, nunca contra el status solo.
 
+La votación es **un** camino, no el único. La lectura en curso del club es `Book.isCurrent`
+—`loadToday` lee `getCurrentClubBook()`, no `Round.winnerBookId`— y se pone a dedo desde
+`/admin` con `setBookAsCurrent` o al crear el libro con `createBook({ marcarComoActual: true })`.
+Cerrar una ronda termina llamando a `setCurrentBookTx`, la misma función. Ojo con la
+consecuencia: si queda una ronda `OPEN` vencida, el cron la cierra y su ganador **pisa** el
+libro que pusiste a mano, archivándolo como `FINISHED`. Por eso el diálogo de agregar libro
+avisa cuando hay una ronda vigente.
+
 **Leer** — `Book` es el catálogo compartido; `UserBook` es la estantería de cada quien
 (`ShelfStatus`); `ReadingProgress` es la bitácora append-only. Los tres se tocan juntos, ver
 "Escrituras: una sola puerta por concepto".
+
+Un libro entra al catálogo por `findOrCreateBook` (`src/server/services/books.ts`), que es el
+helper canónico y acepta un `client` para usarse dentro de transacciones. Sus datos vienen de
+Google Books y Open Library, que devuelven registros sucios con total normalidad: `pageCount`
+en 0, descripciones de más de 8000 caracteres, ISBN concatenados, `coverUrl` vacía. Nada de
+eso pasa `bookInputSchema`, y como las tres puertas de entrada de libros lo parsean, un
+candidato sin sanear hacía lanzar la action y la usuaria solo veía el error genérico de
+producción. Por eso `sanearCandidato` (`src/lib/google-books.ts`) limpia en el **borde**: no
+relajes el schema, que sería aceptar basura dentro de la base para siempre.
+
+Por la misma razón `searchBooks` distingue "sin resultados" de "la búsqueda falló"
+(`BookSearchResult`, y `EstadoBusqueda` del lado de la UI). Colapsar los dos hacía que un 429
+de Google Books —la cuota anónima se quema rápido sin `GOOGLE_BOOKS_API_KEY`— se le mostrara a
+la usuaria como "ese libro no existe".
 
 **Conversar** — `Comment` lleva `chapter`, `isSpoiler`, `isReflection` y `parentId`: las
 cuatro columnas que consume `gateComment()`. `Message` es DM directo entre dos usuarias (sin
@@ -212,6 +250,31 @@ venía de Neon 17, y un dump de una mayor no restaura en una menor.
 un humano. Ni el CI ni el contenedor tocan la base: el `CMD` del Dockerfile arranca la app y
 nada más. Si cambias el schema y nadie corre `db push` contra producción, el deploy queda
 desincronizado y el código nuevo rompe en runtime contra columnas que no existen.
+
+**Cómo se aplica un cambio contra producción** (probado con `Book.publisher`):
+
+```bash
+ssh haiku-vps   # está en ~/.ssh/config
+docker exec haiku_moon-postgres.1.<sufijo> \
+  psql -U postgres -d haiku -c 'ALTER TABLE "Book" ADD COLUMN IF NOT EXISTS "publisher" TEXT;'
+```
+
+Tres cosas que hay que saber antes de correr eso:
+
+- **En ese VPS hay tres Postgres** (`haiku_moon-postgres`, `haiku_unw-postgres`,
+  `n8n_postgres-haiku`). Apuntar al equivocado le rompe la base a otra app. El de este repo es
+  el de imagen `postgres:17`; la base se llama `haiku` y el usuario es `postgres`.
+- **No sirve correr `prisma db push` dentro del contenedor de la app.** El stage final del
+  Dockerfile solo copia `.next/standalone` más `node_modules/.prisma` y `@prisma/client`: la
+  CLI de Prisma es devDependency y no viaja, y `prisma/schema.prisma` tampoco está en la
+  imagen. Para una columna opcional, el `ALTER` a mano es exactamente el SQL que generaría
+  `db push`, con menos piezas.
+- Los nombres van **entre comillas dobles**: los modelos no tienen `@@map` ni `@map`, así que
+  la tabla es `"Book"` tal cual. Y usa `IF NOT EXISTS` para que reintentar sea inofensivo.
+
+Verifica siempre antes y después con
+`information_schema.columns`, y acordate del orden: schema aditivo primero, deploy del código
+después.
 
 Hay backup diario en el VPS (`/root/backup-moon-cl.sh`, 11:20 UTC, retiene 14 días en
 `/root/backups/moon-cl/`). Descarta a propósito los dumps de menos de 1KB: un respaldo vacío
@@ -274,8 +337,36 @@ validación cosmética: las URLs de avatar son públicas y viajan en el HTML de 
 perfil, así que sin ella alguien podía guardarse la URL ajena y disparar el borrado del
 archivo de otra persona. Se comprueba al guardar **y** al borrar.
 
-Si agregas portadas de libros al bucket, van con otro prefijo (`covers/`) y **no** con esta
-regla: una portada no tiene dueño, es del catálogo, y su permiso es admin o moderador.
+Las portadas de libros ya viven en el bucket con el prefijo `covers/`
+(`src/lib/storage/cover-key.ts`, endpoint `POST /api/cover`) y **no** llevan esa regla: una
+portada no tiene dueño, es del catálogo, y su permiso es de rol — moderadora o admin, que se
+verifica en el endpoint con `isModeratorOrAbove`.
+
+La portada se optimiza **en el navegador** antes de subirla (`src/lib/image-optimizer.ts`:
+canvas → WebP, 600px de ancho), no en el servidor: el VPS ya corre ~19 contenedores y no
+tiene RAM de sobra, que es la misma razón por la que tampoco buildea ahí. Dos detalles que
+parecen adorno y no lo son: `imageOrientation: "from-image"` en `createImageBitmap` (sin él
+las fotos de celular salen acostadas, porque el canvas ignora la orientación EXIF), y que el
+`size` que se manda a `/api/cover` sea el del archivo **ya optimizado** — va firmado como
+`ContentLength` y el storage rechaza con 403 cualquier PUT que traiga más bytes.
+
+### Lo que cruza al cliente
+
+`aPersonaPublica()` (`src/lib/persona-publica.ts`) es la única forma de mandar datos de otra
+socia a un componente cliente. Devuelve `id`, `nombre` e `iniciales` **ya resueltos en el
+servidor**, nunca el correo: lo que viaja como prop de un `"use client"` queda embebido en el
+payload RSC y lo lee cualquiera con el inspector. Es la misma doctrina de `gateComment()`.
+
+`PersonaPublica` declara `email?: never`, y eso no es decorativo. Construir el objeto campo
+por campo no alcanza: `{ ...u, ...aPersonaPublica(u) }` vuelve a colar el correo y TypeScript
+lo deja pasar, porque a las propiedades que vienen de un spread no les aplica el chequeo de
+propiedades de más. Se comprobó: con ese spread, `tsc` **y** el test de frontera daban los dos
+en verde mientras `/club` publicaba el directorio de correos. Con `email?: never` el mismo
+spread deja de compilar.
+
+`src/lib/frontera-correo-cliente.test.ts` recorre el código fuente y falla si un componente
+cliente declara un campo de correo en sus props. Cubre la mitad declarativa; la marca del tipo
+cubre la estructural. Hacen falta las dos.
 
 ## Testing
 
@@ -306,6 +397,20 @@ sueltos: `TodayHero` es `"sin-libro" | "sin-empezar" | "leyendo"`, `GateDecision
 `{ locked: false } | { locked: true; reason }`. Preserva la distinción `null` vs `0` —
 "nunca marcó avance" y "marcó la página 0" son estados distintos y colapsarlos con `?? 0`
 ya causó bugs de copy.
+
+Cuando puedas, elige la forma que hace el error **imposible de escribir** en vez de la que lo
+detecta después. `EstadoBusqueda` separa `"resultados"` de `"sin-resultados"` en vez de tener
+un solo `"ok"` con `books.length`, justamente porque con la primera forma nadie puede volver a
+anidar el aviso donde no se ve.
+
+**Los diálogos con formulario se remontan al abrirse.** El estado no puede vivir en el
+componente que maneja `open`, porque ese no se desmonta nunca: `useState(props.x)` lee las
+props una sola vez y lo que la usuaria toca y cierra SIN guardar sobrevive para siempre. El
+patrón está en `profile-edit-dialog.tsx` — un componente externo con `open` y un contador
+`aperturas`, y el formulario real con `key={aperturas}`. Y no alcanza con confiar en que Radix
+desmonte el contenido al cerrar: durante la animación de salida sigue montado, así que reabrir
+en esa ventana reusa la instancia vieja. Este bug apareció en **seis** diálogos distintos; si
+agregas uno nuevo, nace con el patrón.
 
 `src/components/ui/` son primitivas genéricas al estilo shadcn (envoltorios de Radix +
 `cva` + `cn`) y **no conocen el dominio**: no importes `@/lib/routes` ni tipos de Prisma ahí.
